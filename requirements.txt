@@ -1,0 +1,51 @@
+# Core Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.4.2
+pydantic-settings==2.0.3
+
+# Database
+sqlalchemy==2.0.23
+alembic==1.12.1
+
+# Async & Concurrency
+aiofiles==23.2.1
+
+# AI/ML Services
+openai==1.0.0
+SpeechRecognition==3.10.0
+pydub==0.25.1
+
+# API Clients
+requests==2.31.0
+twilio==8.10.0
+vonage==3.1.0
+
+# Notifications
+firebase-admin==6.2.0
+
+# Utilities
+python-dotenv==1.0.0
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+
+# Logging
+loguru==0.7.2
+
+# Audio Processing - Python 3.12 Compatible
+numpy>=1.26.0
+librosa==0.10.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.1
+
+# Development
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.0
+pre-commit==3.5.0
+
+# Caching
+redis==5.0.1
