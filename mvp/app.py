@@ -1,0 +1,185 @@
+from __future__ import annotations
+
+import os
+import sys
+import json
+from typing import Optional
+import sqlite3
+from datetime import datetime
+
+# Ensure parent project path is importable
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+from fastapi import FastAPI, Request, BackgroundTasks
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from pydantic import BaseModel
+
+from intent_classifier import IntentClassifier, IntentType
+
+app = FastAPI(title="AI Communication Engine - MVP", version="0.1.0")
+
+classifier = IntentClassifier()
+
+# Simple in-memory pub/sub for notifications (SSE)
+import asyncio
+from typing import List
+
+_subscribers: List[asyncio.Queue] = []
+
+async def _publish(message: str):
+    for q in list(_subscribers):
+        try:
+            await q.put(message)
+        except Exception:
+            # ignore subscriber errors
+            pass
+
+
+# Simple SQLite persistence for notifications
+DB_PATH = os.path.join(os.path.dirname(__file__), "mvp_notifications.db")
+
+def _get_db_connection():
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def _init_db():
+    conn = _get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS notifications (
+            id TEXT PRIMARY KEY,
+            payload TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    conn.commit()
+    conn.close()
+
+
+def persist_notification(obj: dict):
+    try:
+        conn = _get_db_connection()
+        cur = conn.cursor()
+        nid = obj.get("id") or f"notif-{int(datetime.utcnow().timestamp()*1000)}"
+        cur.execute(
+            "INSERT OR REPLACE INTO notifications (id, payload, created_at) VALUES (?, ?, ?)",
+            (nid, json.dumps(obj), datetime.utcnow().isoformat())
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def fetch_notifications(limit: int = 100):
+    conn = _get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id, payload, created_at FROM notifications ORDER BY created_at DESC LIMIT ?", (limit,))
+    rows = cur.fetchall()
+    result = []
+    for r in rows:
+        try:
+            payload = json.loads(r["payload"])
+        except Exception:
+            payload = {"raw": r["payload"]}
+        result.append({"id": r["id"], "payload": payload, "created_at": r["created_at"]})
+    conn.close()
+    return result
+
+
+# initialize DB on import
+_init_db()
+
+
+class ProcessRequest(BaseModel):
+    text: str
+    speaker_id: Optional[str] = None
+
+
+@app.get("/mvp/health")
+async def health():
+    return {"status": "healthy", "component": "mvp"}
+
+
+@app.post("/mvp/process")
+async def process(req: ProcessRequest):
+    """Process text through the existing `IntentClassifier` and return a simple task POC."""
+    classification = await classifier.classify(req.text, req.speaker_id)
+
+    result = {
+        "classification": classification.to_dict(),
+        "requires_human_review": classification.requires_human_review,
+    }
+
+    # Simple task creation POC
+    intent_value = classification.intent_type.value if hasattr(classification, 'intent_type') else None
+    if intent_value in (IntentType.TASK.value, IntentType.URGENT.value, IntentType.ESCALATION.value):
+        task = {
+            "id": "mvp-task-1",
+            "description": classification.primary_intent,
+            "priority": classification.suggested_priority,
+            "extracted_entities": classification.extracted_entities,
+        }
+        result["task"] = task
+    else:
+        result["task"] = None
+
+    return {"status": "ok", "result": result}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("mvp.app:app", host="127.0.0.1", port=8800, reload=True)
+
+
+@app.post("/mvp/notify")
+async def notify(payload: dict, background_tasks: BackgroundTasks):
+    """Receive a notification (e.g., a created task) and publish to connected UI clients."""
+    # persist and publish
+    try:
+        persist_notification(payload)
+    except Exception as e:
+        return JSONResponse({"status": "error", "error": str(e)}, status_code=500)
+
+    message = json.dumps(payload)
+    background_tasks.add_task(_publish, message)
+    return JSONResponse({"status": "published"})
+
+
+@app.get("/mvp/history")
+async def history(limit: int = 100):
+    """Return historical notifications from the lightweight store."""
+    items = fetch_notifications(limit)
+    return {"count": len(items), "items": items}
+
+
+@app.get("/mvp/stream")
+async def stream():
+    """SSE stream endpoint clients can subscribe to for notifications."""
+    queue: asyncio.Queue = asyncio.Queue()
+    _subscribers.append(queue)
+
+    async def event_generator(q: asyncio.Queue):
+        try:
+            while True:
+                data = await q.get()
+                yield f"data: {data}\n\n"
+        finally:
+            # cleanup when client disconnects
+            try:
+                _subscribers.remove(q)
+            except ValueError:
+                pass
+
+    return StreamingResponse(event_generator(queue), media_type="text/event-stream")
+
+
+@app.get("/mvp/ui")
+async def ui():
+    """Serve a tiny HTML UI that connects to the SSE stream and shows notifications."""
+    return FileResponse(os.path.join(os.path.dirname(__file__), "static", "index.html"))
