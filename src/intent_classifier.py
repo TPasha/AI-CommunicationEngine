@@ -18,6 +18,12 @@ try:
 except ImportError:
     HAS_OPENAI = False
 
+try:
+    from transformers import pipeline
+    HAS_TRANSFORMERS = True
+except ImportError:
+    HAS_TRANSFORMERS = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +34,12 @@ class IntentType(str, Enum):
     GENERAL_CHATTER = "general_chatter"
     URGENT = "urgent"
     ESCALATION = "escalation"
+
+
+class LLMProvider(str, Enum):
+    """Available LLM providers for intent classification"""
+    OPENAI_GPT = "openai_gpt"
+    HUGGINGFACE = "huggingface"
 
 
 @dataclass
@@ -104,16 +116,37 @@ class IntentClassifier:
     
     def __init__(
         self,
-        model: str = "gpt-4-turbo-preview",
+        provider: str = "huggingface",
+        model: str = "facebook/bart-large-mnli",
         temperature: float = 0.7,
         max_tokens: int = 500,
         timeout_ms: int = 1500
     ):
+        self.provider = LLMProvider(provider)
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.timeout_seconds = timeout_ms / 1000
         self.entity_extractor = EntityExtractor()
+        
+        self._initialize_provider()
+    
+    def _initialize_provider(self):
+        """Initialize the LLM provider"""
+        if self.provider == LLMProvider.OPENAI_GPT:
+            if not HAS_OPENAI:
+                raise ImportError("openai package required for GPT support")
+        
+        elif self.provider == LLMProvider.HUGGINGFACE:
+            if not HAS_TRANSFORMERS:
+                raise ImportError("transformers package required for Hugging Face support")
+            # Initialize zero-shot classification pipeline
+            self.hf_pipeline = pipeline(
+                "zero-shot-classification",
+                model=self.model
+            )
+        
+        logger.info(f"Initialized intent classifier: {self.provider}")
     
     async def classify(
         self,
@@ -133,10 +166,17 @@ class IntentClassifier:
             IntentClassification or None
         """
         try:
-            if not HAS_OPENAI:
-                return self._classify_with_rules(text, context)
+            if self.provider == LLMProvider.OPENAI_GPT:
+                if not HAS_OPENAI:
+                    return self._classify_with_rules(text, context)
+                classification = await self._classify_with_gpt(text, speaker_id, context)
+            elif self.provider == LLMProvider.HUGGINGFACE:
+                if not HAS_TRANSFORMERS:
+                    return self._classify_with_rules(text, context)
+                classification = await self._classify_with_huggingface(text, speaker_id, context)
+            else:
+                classification = self._classify_with_rules(text, context)
             
-            classification = await self._classify_with_llm(text, speaker_id, context)
             return classification
         
         except asyncio.TimeoutError:
@@ -146,7 +186,7 @@ class IntentClassifier:
             logger.error(f"Classification error: {str(e)}")
             return self._classify_with_rules(text, context)
     
-    async def _classify_with_llm(
+    async def _classify_with_gpt(
         self,
         text: str,
         speaker_id: Optional[str] = None,
@@ -222,6 +262,78 @@ class IntentClassifier:
             raise
         except Exception as e:
             logger.error(f"LLM error: {str(e)}")
+            return self._classify_with_rules(text, context)
+    
+    async def _classify_with_huggingface(
+        self,
+        text: str,
+        speaker_id: Optional[str] = None,
+        context: Optional[Dict] = None
+    ) -> Optional[IntentClassification]:
+        """Classify using Hugging Face zero-shot classification"""
+        try:
+            # Define intent labels for zero-shot classification
+            candidate_labels = [
+                "task request",
+                "information inquiry", 
+                "urgent situation",
+                "escalation request",
+                "general conversation"
+            ]
+            
+            # Run classification in a thread to avoid blocking
+            result = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.hf_pipeline,
+                    text,
+                    candidate_labels,
+                    multi_class=False
+                ),
+                timeout=self.timeout_seconds
+            )
+            
+            # Map top result to intent type
+            top_label = result["labels"][0]
+            confidence = result["scores"][0]
+            
+            intent_mapping = {
+                "task request": IntentType.TASK,
+                "information inquiry": IntentType.INQUIRY,
+                "urgent situation": IntentType.URGENT,
+                "escalation request": IntentType.ESCALATION,
+                "general conversation": IntentType.GENERAL_CHATTER
+            }
+            
+            intent_type = intent_mapping.get(top_label, IntentType.GENERAL_CHATTER)
+            
+            # Extract entities from text
+            entities = self.entity_extractor.extract_entities(text)
+            
+            # Determine priority and review status
+            requires_review = intent_type in [IntentType.URGENT, IntentType.ESCALATION]
+            priority = 5 if intent_type == IntentType.URGENT else \
+                      4 if intent_type == IntentType.ESCALATION else \
+                      3 if intent_type == IntentType.TASK else \
+                      2 if intent_type == IntentType.INQUIRY else 1
+            
+            classification = IntentClassification(
+                intent_type=intent_type,
+                confidence=float(confidence),
+                primary_intent=top_label,
+                secondary_intents=result["labels"][1:3] if len(result["labels"]) > 1 else [],
+                extracted_entities=entities,
+                requires_human_review=requires_review,
+                reasoning=f"Zero-shot classification: {top_label} ({confidence:.2%})",
+                suggested_priority=priority
+            )
+            
+            logger.info(f"Classified intent (Hugging Face): {classification.intent_type.value} ({confidence:.2%})")
+            return classification
+        
+        except asyncio.TimeoutError:
+            raise
+        except Exception as e:
+            logger.error(f"Hugging Face classification error: {str(e)}")
             return self._classify_with_rules(text, context)
     
     def _classify_with_rules(

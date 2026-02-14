@@ -101,14 +101,18 @@ class CommunicationMiddleware:
         
         # Initialize services
         self.transcription_service = TranscriptionService(
-            provider=TranscriptionProvider.OPENAI_WHISPER,
-            api_key=config.get("openai", "api_key"),
-            model=config.get("transcription", "model", fallback="whisper-1")
+            provider=config.get("transcription", "provider", fallback="huggingface_whisper"),
+            api_key=config.get("openai", "api_key", fallback=None),
+            model=config.get("transcription", "model", fallback="openai/whisper-tiny"),
+            language=config.get("transcription", "language", fallback="en"),
+            timeout_ms=int(config.get("transcription", "timeout", fallback="2000"))
         )
         
         self.intent_classifier = IntentClassifier(
-            model=config.get("llm", "model", fallback="gpt-4-turbo-preview"),
-            temperature=float(config.get("llm", "temperature", fallback="0.7"))
+            provider=config.get("llm", "provider", fallback="huggingface"),
+            model=config.get("llm", "model", fallback="facebook/bart-large-mnli"),
+            temperature=float(config.get("llm", "temperature", fallback="0.7")),
+            max_tokens=int(config.get("llm", "max_tokens", fallback="500"))
         )
         
         self.notification_service = NotificationService(
