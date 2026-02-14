@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
-from models import (
+from .models import (
     Task, TaskStatus, StaffMember, StaffAvailabilityStatus,
     Transcription, InventoryStatus
 )

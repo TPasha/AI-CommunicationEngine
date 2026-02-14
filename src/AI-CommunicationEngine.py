@@ -16,12 +16,12 @@ from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from models import init_db, get_session, Transcription, Task, AudioSource, IntentType
-from transcription_service import TranscriptionService, TranscriptionProvider
-from intent_classifier import IntentClassifier
-from task_action_engine import TaskActionEngine, TaskPrioritizer
-from notification_service import NotificationService, NotificationPriority
-from webhook_handlers import WebhookRouter, TwilioWebhookHandler, VonageWebhookHandler, WalkieTalkieWebhookHandler
+from .models import init_db, get_session, Transcription, Task, AudioSource, IntentType
+from .transcription_service import TranscriptionService, TranscriptionProvider
+from .intent_classifier import IntentClassifier
+from .task_action_engine import TaskActionEngine, TaskPrioritizer
+from .notification_service import NotificationService, NotificationPriority
+from .webhook_handlers import WebhookRouter, TwilioWebhookHandler, VonageWebhookHandler, WalkieTalkieWebhookHandler
 
 logger = logging.getLogger(__name__)
 
@@ -421,7 +421,7 @@ async def update_task_status(task_id: str, new_status: str):
             raise HTTPException(status_code=404, detail="Task not found")
         
         # Import TaskStatus here to avoid circular imports
-        from models import TaskStatus
+        from .models import TaskStatus
         
         task.status = TaskStatus[new_status.upper()]
         if new_status.upper() == "COMPLETED":

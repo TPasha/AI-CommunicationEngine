@@ -13,12 +13,12 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from fastapi import FastAPI, Request, BackgroundTasks
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from intent_classifier import IntentClassifier, IntentType
+from src.intent_classifier import IntentClassifier, IntentType
 
 app = FastAPI(title="AI Communication Engine - MVP", version="0.1.0")
 
@@ -187,10 +187,27 @@ async def stream():
     return StreamingResponse(event_generator(queue), media_type="text/event-stream")
 
 
+def _load_index_html():
+    """Load index.html with proper UTF-8 encoding."""
+    templates_dir = os.path.join(os.path.dirname(__file__), "templates")
+    index_path = os.path.join(templates_dir, "index.html")
+    with open(index_path, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+@app.get("/")
+@app.get("/mvp")
+async def root():
+    """Serve the AI Command Center dashboard at root and /mvp."""
+    html_content = _load_index_html()
+    return HTMLResponse(content=html_content)
+
+
 @app.get("/mvp/ui")
 async def ui(request: Request):
-    """Render the UI template using Jinja2."""
-    return templates.TemplateResponse("index.html", {"request": request})
+    """Serve the AI Command Center React dashboard."""
+    html_content = _load_index_html()
+    return HTMLResponse(content=html_content)
 
 
 # Catch-all for paths under /mvp to show a friendly UI page

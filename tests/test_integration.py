@@ -9,19 +9,19 @@ from datetime import datetime
 from unittest.mock import Mock, patch, AsyncMock
 
 # Database tests
-from models import (
+from src.models import (
     init_db, Session, Transcription, Task, StaffMember, AudioSource,
     IntentType, TaskStatus, StaffAvailabilityStatus
 )
 
 # Service tests
-from transcription_service import TranscriptionService, TranscriptionProvider, TranscriptionResult
-from intent_classifier import IntentClassifier, EntityExtractor, IntentClassification
-from task_action_engine import TaskActionEngine, TaskPrioritizer, TaskAssigner
-from notification_service import NotificationService, NotificationPriority
+from src.transcription_service import TranscriptionService, TranscriptionProvider, TranscriptionResult
+from src.intent_classifier import IntentClassifier, EntityExtractor, IntentClassification
+from src.task_action_engine import TaskActionEngine, TaskPrioritizer, TaskAssigner
+from src.notification_service import NotificationService, NotificationPriority
 
 # Webhook tests
-from webhook_handlers import (
+from src.webhook_handlers import (
     TwilioWebhookHandler, VonageWebhookHandler, WalkieTalkieWebhookHandler
 )
 
