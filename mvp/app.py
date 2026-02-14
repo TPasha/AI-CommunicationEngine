@@ -13,7 +13,9 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from fastapi import FastAPI, Request, BackgroundTasks
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from intent_classifier import IntentClassifier, IntentType
@@ -21,6 +23,12 @@ from intent_classifier import IntentClassifier, IntentType
 app = FastAPI(title="AI Communication Engine - MVP", version="0.1.0")
 
 classifier = IntentClassifier()
+
+# Mount static files and templates
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.isdir(static_dir):
+    app.mount("/mvp/static", StaticFiles(directory=static_dir), name="mvp_static")
+templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
 
 # Simple in-memory pub/sub for notifications (SSE)
 import asyncio
@@ -180,6 +188,12 @@ async def stream():
 
 
 @app.get("/mvp/ui")
-async def ui():
-    """Serve a tiny HTML UI that connects to the SSE stream and shows notifications."""
-    return FileResponse(os.path.join(os.path.dirname(__file__), "static", "index.html"))
+async def ui(request: Request):
+    """Render the UI template using Jinja2."""
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+# Catch-all for paths under /mvp to show a friendly UI page
+@app.get("/mvp/{full_path:path}")
+async def catch_all(request: Request, full_path: str):
+    return templates.TemplateResponse("catch.html", {"request": request, "path": full_path})

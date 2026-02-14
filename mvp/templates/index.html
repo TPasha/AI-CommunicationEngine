@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}MVP Notifications UI{% endblock %}
+
+{% block content %}
+  <h2>MVP Notifications (Live)</h2>
+  <div id="log"></div>
+
+  <h3>Send Demo Notification</h3>
+  <form id="notifyForm">
+    <input id="text" placeholder='{"id":"t1","description":"Test"}' style="width:60%" />
+    <button type="submit">Send</button>
+  </form>
+
+  <h3>History</h3>
+  <div id="history" style="border:1px solid #ddd;padding:10px;height:200px;overflow:auto"></div>
+
+  <script>
+    const log = document.getElementById('log');
+
+    const es = new EventSource('/mvp/stream');
+    es.onmessage = (evt) => {
+      const obj = JSON.parse(evt.data);
+      const el = document.createElement('div');
+      el.className = 'item';
+      el.textContent = '[' + new Date().toLocaleTimeString() + '] ' + JSON.stringify(obj);
+      log.prepend(el);
+    };
+
+    document.getElementById('notifyForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      let value = document.getElementById('text').value || '{}';
+      let payload;
+      try { payload = JSON.parse(value); } catch (err) { alert('Invalid JSON'); return; }
+      await fetch('/mvp/notify', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      document.getElementById('text').value = '';
+    });
+
+    async function loadHistory(){
+      try{
+        const r = await fetch('/mvp/history');
+        const j = await r.json();
+        const hist = document.getElementById('history');
+        hist.innerHTML = '';
+        j.items.forEach(it => {
+          const el = document.createElement('div');
+          el.className = 'item';
+          el.textContent = '[' + new Date(it.created_at).toLocaleString() + '] ' + JSON.stringify(it.payload);
+          hist.appendChild(el);
+        });
+      }catch(e){ console.error(e) }
+    }
+
+    // load history on open
+    loadHistory();
+
+    // refresh periodically
+    setInterval(loadHistory, 5000);
+  </script>
+{% endblock %}

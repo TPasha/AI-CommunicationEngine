@@ -31,3 +31,15 @@ Files
 
 - `app.py` — FastAPI MVP endpoints using the repo's `intent_classifier`.
 - `requirements.txt` — minimal dependencies for running the MVP.
+
+Docker demo
+
+Build and run the MVP in Docker (recommended for a demo):
+
+```bash
+# from project root
+docker compose -f docker-compose.mvp.yml up --build -d
+```
+
+Then open the UI at: http://localhost:8830/mvp/ui
+
