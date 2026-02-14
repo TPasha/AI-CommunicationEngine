@@ -8,13 +8,13 @@ import logging
 from pathlib import Path
 import sys
 
-# Add current directory to path
-sys.path.insert(0, str(Path(__file__).parent))
+# Add parent directory to path so we can import from src/
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from models import init_db, Session, Transcription, Task, StaffMember, AudioSource, IntentType, TaskStatus
-from transcription_service import TranscriptionService, TranscriptionProvider
-from intent_classifier import IntentClassifier
-from task_action_engine import TaskActionEngine, TaskPrioritizer
+from src.models import init_db, get_session, Transcription, Task, StaffMember, AudioSource, IntentType, TaskStatus, Base
+from src.transcription_service import TranscriptionService, TranscriptionProvider
+from src.intent_classifier import IntentClassifier
+from src.task_action_engine import TaskActionEngine, TaskPrioritizer
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,10 +32,10 @@ async def demo_transcription():
         model="whisper-1"
     )
     
-    print("✓ Transcription service initialized")
-    print("✓ Provider: OpenAI Whisper")
-    print("✓ Model: whisper-1")
-    print("✓ Supported languages: 11+ languages")
+    print("[OK] Transcription service initialized")
+    print("[OK] Provider: OpenAI Whisper")
+    print("[OK] Model: whisper-1")
+    print("[OK] Supported languages: 11+ languages")
     print("\nNote: Actual transcription requires valid OpenAI API key")
 
 
@@ -62,7 +62,7 @@ async def demo_intent_classification():
         print(f"\n  Input: '{text}'")
         
         # Use rule-based classification for demo (no API key needed)
-        from intent_classifier import EntityExtractor
+        from src.intent_classifier import EntityExtractor
         entities = EntityExtractor.extract_entities(text)
         
         print(f"  Extracted Entities:")
@@ -115,7 +115,7 @@ async def demo_priority_calculation():
         print(f"    Urgency: {scenario['urgency_level']}/5")
         print(f"    Staff Load: {scenario['current_staff_load']}/10")
         print(f"    Calculated Priority: {priority}/5")
-        print(f"    ✓ Matches expected: {priority == scenario['expected']}")
+        print(f"    [OK] Matches expected: {priority == scenario['expected']}")
 
 
 async def demo_database_operations():
@@ -125,8 +125,8 @@ async def demo_database_operations():
     print("="*60)
     
     # Initialize database
-    init_db()
-    db = Session()
+    engine = init_db()
+    db = get_session(engine)
     
     try:
         # Create sample staff member
@@ -142,7 +142,7 @@ async def demo_database_operations():
         db.add(staff)
         db.commit()
         
-        print(f"\n✓ Created staff member: {staff.name}")
+        print(f"\n[OK] Created staff member: {staff.name}")
         print(f"  ID: {staff.id}")
         print(f"  Department: {staff.department}")
         print(f"  Skills: {staff.skills}")
@@ -153,6 +153,7 @@ async def demo_database_operations():
             raw_text="Room 301 needs more towels and soap immediately",
             confidence_score=0.95,
             speaker_id="caller_123",
+            audio_stream_id="stream_001",
             intent_type=IntentType.TASK,
             requires_human_review=False
         )
@@ -160,7 +161,7 @@ async def demo_database_operations():
         db.add(transcription)
         db.commit()
         
-        print(f"\n✓ Created transcription: {transcription.id}")
+        print(f"\n[OK] Created transcription: {transcription.id}")
         print(f"  Source: {transcription.source.value}")
         print(f"  Confidence: {transcription.confidence_score:.1%}")
         print(f"  Intent: {transcription.intent_type.value}")
@@ -181,14 +182,14 @@ async def demo_database_operations():
         db.add(task)
         db.commit()
         
-        print(f"\n✓ Created task: {task.id}")
+        print(f"\n[OK] Created task: {task.id}")
         print(f"  Status: {task.status.value}")
         print(f"  Priority: {task.priority}/5")
         print(f"  Assigned to: {staff.name}")
         print(f"  Location: {task.location}")
         
         # Query and display
-        print(f"\n✓ Querying database...")
+        print(f"\n[OK] Querying database...")
         
         total_tasks = db.query(Task).count()
         print(f"  Total tasks: {total_tasks}")
@@ -209,7 +210,7 @@ async def demo_knowledge_base():
     print("DEMO 5: Knowledge Base Query")
     print("="*60)
     
-    from intent_classifier import HotelKnowledgeBase
+    from src.intent_classifier import HotelKnowledgeBase
     
     kb = HotelKnowledgeBase()
     
@@ -241,44 +242,44 @@ async def demo_workflow():
     
     print("\nSimulating complete audio processing flow:")
     print("\n1. Audio Input")
-    print("   └─ Room 302 requesting housekeeping items")
+    print("   `-- Room 302 requesting housekeeping items")
     
     print("\n2. Transcription")
-    print("   └─ 'Room 302 needs clean sheets and pillows right away'")
+    print("   `-- 'Room 302 needs clean sheets and pillows right away'")
     
     print("\n3. Intent Classification")
-    print("   └─ Intent: TASK")
-    print("   └─ Urgency: HIGH (5/5)")
-    print("   └─ Location: Room 302")
+    print("   `-- Intent: TASK")
+    print("   `-- Urgency: HIGH (5/5)")
+    print("   `-- Location: Room 302")
     
     print("\n4. Priority Calculation")
-    print("   ├─ Urgency weight: 40%")
-    print("   ├─ Inventory status: 20%")
-    print("   ├─ Staff workload: 20%")
-    print("   └─ Priority: 5/5")
+    print("   |-- Urgency weight: 40%")
+    print("   |-- Inventory status: 20%")
+    print("   |-- Staff workload: 20%")
+    print("   `-- Priority: 5/5")
     
     print("\n5. Staff Assignment")
-    print("   └─ John Smith (Housekeeping)")
-    print("   └─ Available & skilled in room_service")
+    print("   `-- John Smith (Housekeeping)")
+    print("   `-- Available & skilled in room_service")
     
     print("\n6. Notification Dispatch")
-    print("   ├─ Push notification")
-    print("   ├─ SMS alert")
-    print("   └─ Voice call (if high urgency)")
+    print("   |-- Push notification")
+    print("   |-- SMS alert")
+    print("   `-- Voice call (if high urgency)")
     
     print("\n7. Task Tracking")
-    print("   └─ Task created, assigned, and tracked in database")
+    print("   `-- Task created, assigned, and tracked in database")
 
 
 async def main():
     """Run all demos"""
     
     print("\n")
-    print("╔" + "═"*58 + "╗")
-    print("║" + " "*58 + "║")
-    print("║" + "  AI Communication Engine - Demo Suite".center(58) + "║")
-    print("║" + " "*58 + "║")
-    print("╚" + "═"*58 + "╝")
+    print("+" + "-"*58 + "+")
+    print("|" + " "*58 + "|")
+    print("|" + "  AI Communication Engine - Demo Suite".center(58) + "|")
+    print("|" + " "*58 + "|")
+    print("+" + "-"*58 + "+")
     
     try:
         await demo_transcription()
@@ -289,16 +290,16 @@ async def main():
         await demo_workflow()
         
         print("\n" + "="*60)
-        print("✓ ALL DEMOS COMPLETED SUCCESSFULLY")
+        print("[OK] ALL DEMOS COMPLETED SUCCESSFULLY")
         print("="*60)
         print("\nTo start the full service:")
-        print("  python AI-CommunicationEngine.py")
-        print("  (or: uvicorn AI-CommunicationEngine:app --reload)")
+        print("  python src/AI-CommunicationEngine.py")
+        print("  (or: uvicorn src.AI-CommunicationEngine:app --reload)")
         print("\n")
     
     except Exception as e:
         logger.error(f"Demo error: {str(e)}")
-        print(f"\n❌ Error: {str(e)}")
+        print(f"\n[FAIL] Error: {str(e)}")
 
 
 if __name__ == "__main__":

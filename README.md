@@ -69,29 +69,29 @@ cp .env.example .env
 
 ```bash
 # Database auto-initializes on first run
-python -c "from models import init_db; init_db()"
+python -c "from src.models import init_db; init_db()"
 ```
 
 ### 6. Run the Service
 
 #### Option A: Using Uvicorn (Recommended)
 ```bash
-uvicorn AI-CommunicationEngine:app --reload --host 0.0.0.0 --port 8000
+uvicorn src.AI-CommunicationEngine:app --reload --host 0.0.0.0 --port 8000
 ```
 
 #### Option B: Direct Python
 ```bash
-python AI-CommunicationEngine.py
+python src/AI-CommunicationEngine.py
 ```
 
 ### 7. Test the Service
 
 ```bash
 # Run demo script
-python demo.py
+python mvp/demo.py
 
 # Run integration tests
-pytest test_integration.py -v
+pytest tests/test_integration.py -v
 
 # Check health endpoint
 curl http://localhost:8000/health
@@ -356,7 +356,7 @@ timeout_ms = 30000
 
 ```python
 import asyncio
-from models import init_db, AudioSource, IntentType
+from src.models import init_db, AudioSource, IntentType
 from AI_CommunicationEngine import middleware
 
 async def process_call(audio_bytes):
@@ -433,16 +433,16 @@ async function submitAudio(audioData) {
 
 ```bash
 # Run all tests
-pytest test_integration.py -v
+pytest tests/test_integration.py -v
 
 # Run specific test class
-pytest test_integration.py::TestDatabaseModels -v
+pytest tests/test_integration.py::TestDatabaseModels -v
 
 # Run with coverage
-pytest test_integration.py --cov=.
+pytest tests/test_integration.py --cov=.
 
 # Run demo
-python demo.py
+python mvp/demo.py
 ```
 
 ## Performance
@@ -486,13 +486,15 @@ curl https://api.openai.com/v1/models -H "Authorization: Bearer $OPENAI_API_KEY"
 ### Docker
 
 ```bash
-docker build -t ai-comm-engine:latest .
+cd docker
+docker build -t ai-comm-engine:latest -f Dockerfile ..
 docker run -p 8000:8000 --env-file .env ai-comm-engine:latest
 ```
 
 ### Docker Compose
 
 ```bash
+cd docker
 docker-compose up -d
 ```
 

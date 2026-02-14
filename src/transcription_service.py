@@ -16,12 +16,19 @@ try:
 except ImportError:
     HAS_OPENAI = False
 
+try:
+    from transformers import pipeline
+    HAS_TRANSFORMERS = True
+except ImportError:
+    HAS_TRANSFORMERS = False
+
 logger = logging.getLogger(__name__)
 
 
 class TranscriptionProvider(str, Enum):
     """Available transcription providers"""
     OPENAI_WHISPER = "openai_whisper"
+    HUGGINGFACE_WHISPER = "huggingface_whisper"
     GOOGLE_CLOUD = "google_cloud"
     AZURE = "azure"
     AWS = "aws"
@@ -88,6 +95,15 @@ class TranscriptionService:
             if self.api_key:
                 openai.api_key = self.api_key
         
+        elif self.provider == TranscriptionProvider.HUGGINGFACE_WHISPER:
+            if not HAS_TRANSFORMERS:
+                raise ImportError("transformers package required for Hugging Face Whisper support")
+            # Initialize the Hugging Face pipeline
+            self.hf_pipeline = pipeline(
+                "automatic-speech-recognition",
+                model=self.model
+            )
+        
         logger.info(f"Initialized transcription service: {self.provider}")
     
     async def transcribe_audio(
@@ -110,6 +126,8 @@ class TranscriptionService:
         try:
             if self.provider == TranscriptionProvider.OPENAI_WHISPER:
                 return await self._transcribe_whisper(audio_data, speaker_id)
+            elif self.provider == TranscriptionProvider.HUGGINGFACE_WHISPER:
+                return await self._transcribe_huggingface(audio_data, speaker_id)
             else:
                 logger.warning(f"Provider {self.provider} not implemented")
                 return None
@@ -163,6 +181,50 @@ class TranscriptionService:
             raise
         except Exception as e:
             logger.error(f"Whisper API error: {str(e)}")
+            return None
+    
+    async def _transcribe_huggingface(
+        self,
+        audio_data: bytes,
+        speaker_id: Optional[str] = None
+    ) -> Optional[TranscriptionResult]:
+        """Transcribe using Hugging Face Whisper model"""
+        try:
+            # Convert bytes to audio file for inference
+            audio_file = io.BytesIO(audio_data)
+            
+            # Run the pipeline in a thread to avoid blocking
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.hf_pipeline,
+                    audio_file,
+                    language=self.language if self.language != "en" else None
+                ),
+                timeout=self.timeout_seconds
+            )
+            
+            text = response.get("text", "").strip()
+            
+            if not text:
+                logger.warning("Empty transcription result from Hugging Face")
+                return None
+            
+            # Hugging Face doesn't provide confidence scores, use default
+            result = TranscriptionResult(
+                text=text,
+                confidence=0.85,
+                duration=len(audio_data) / (16000 * 2),
+                speaker_id=speaker_id,
+                metadata={"provider": "huggingface_whisper", "model": self.model}
+            )
+            
+            logger.info(f"Transcribed {len(text)} chars from speaker {speaker_id} using Hugging Face")
+            return result
+        
+        except asyncio.TimeoutError:
+            raise
+        except Exception as e:
+            logger.error(f"Hugging Face Whisper error: {str(e)}")
             return None
     
     def get_supported_languages(self) -> list:

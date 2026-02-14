@@ -210,7 +210,14 @@ async def ui(request: Request):
     return HTMLResponse(content=html_content)
 
 
-# Catch-all for paths under /mvp to show a friendly UI page
+# Catch-all for paths under /mvp
 @app.get("/mvp/{full_path:path}")
-async def catch_all(request: Request, full_path: str):
-    return templates.TemplateResponse("catch.html", {"request": request, "path": full_path})
+async def catch_all(full_path: str):
+    return JSONResponse(
+        status_code=404,
+        content={
+            "error": "Not found",
+            "path": f"/mvp/{full_path}",
+            "available_endpoints": ["/", "/mvp", "/mvp/ui", "/mvp/health", "/mvp/stream", "/mvp/notify", "/mvp/history"]
+        }
+    )
