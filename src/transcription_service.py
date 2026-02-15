@@ -190,18 +190,39 @@ class TranscriptionService:
     ) -> Optional[TranscriptionResult]:
         """Transcribe using Hugging Face Whisper model"""
         try:
-            # Convert bytes to audio file for inference
-            audio_file = io.BytesIO(audio_data)
-            
-            # Run the pipeline in a thread to avoid blocking
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    self.hf_pipeline,
-                    audio_file,
-                    language=self.language if self.language != "en" else None
-                ),
-                timeout=self.timeout_seconds
-            )
+            # Try to load audio using librosa (handles WebM, MP3, etc.)
+            try:
+                import librosa
+                import numpy as np
+                
+                # Load audio from bytes
+                y, sr = librosa.load(io.BytesIO(audio_data), sr=16000, mono=True)
+                logger.info(f"Loaded audio using librosa: {len(y)} samples at {sr}Hz")
+                
+                # Convert to the format Whisper expects
+                # The pipeline can accept numpy arrays
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.hf_pipeline,
+                        y,
+                        sampling_rate=sr,
+                        language=self.language if self.language != "en" else None
+                    ),
+                    timeout=self.timeout_seconds
+                )
+            except ImportError:
+                # Fallback: try using io.BytesIO directly
+                logger.warning("librosa not available, trying direct BytesIO")
+                audio_file = io.BytesIO(audio_data)
+                
+                response = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        self.hf_pipeline,
+                        audio_file,
+                        language=self.language if self.language != "en" else None
+                    ),
+                    timeout=self.timeout_seconds
+                )
             
             text = response.get("text", "").strip()
             

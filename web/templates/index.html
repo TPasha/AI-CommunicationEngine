@@ -85,22 +85,281 @@
     </style>
 </head>
 <body class="bg-slate-950 text-slate-50 overflow-hidden">
-    <div id="root" class="w-full h-screen flex flex-col"></div>
+    <div id="root" class="w-full h-screen flex flex-col">
+        <div style="display: flex; align-items: center; justify-content: center; height: 100vh; color: #888;">
+            <p>Loading AI Command Center...</p>
+        </div>
+    </div>
+
+    <script>
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            console.error('ERROR:', msg, 'at line', lineNo);
+            document.getElementById('root').innerHTML = `
+                <div style="color: #ef4444; padding: 40px; font-family: monospace;">
+                    <h2>❌ Error Loading Dashboard</h2>
+                    <p>${msg}</p>
+                    <p style="color: #888; font-size: 12px;">Check browser console for details</p>
+                </div>
+            `;
+            return true;
+        };
+    </script>
 
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useCallback } = React;
+        const { useState, useRef } = React;
 
-        // Demo data generator
+        function VoiceRecorder({ onTaskCreated }) {
+            const [isRecording, setIsRecording] = useState(false);
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [status, setStatus] = useState('');
+            const mediaRecorderRef = useRef(null);
+            const chunksRef = useRef([]);
+
+            const startRecording = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    chunksRef.current = [];
+                    mediaRecorderRef.current = new MediaRecorder(stream);
+                    
+                    mediaRecorderRef.current.ondataavailable = (e) => {
+                        chunksRef.current.push(e.data);
+                    };
+                    
+                    mediaRecorderRef.current.onstop = async () => {
+                        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+                        if (blob.size === 0) {
+                            setStatus('❌ No audio recorded');
+                            setIsProcessing(false);
+                            return;
+                        }
+                        
+                        const formData = new FormData();
+                        formData.append('file', blob, 'recording.webm');
+                        
+                        try {
+                            const res = await fetch('/mvp/voice', { method: 'POST', body: formData });
+                            const data = await res.json();
+                            
+                            if (!res.ok) {
+                                setStatus(`❌ ${data.message || 'Server error'}`);
+                            } else {
+                                const text = data.transcription || '(no speech detected)';
+                                setStatus(`✅ "${text}"`);
+                                if (onTaskCreated) onTaskCreated(data);
+                                setTimeout(() => setStatus(''), 3000);
+                            }
+                        } catch (err) {
+                            setStatus(`❌ ${err.message}`);
+                        } finally {
+                            setIsProcessing(false);
+                        }
+                    };
+                    
+                    mediaRecorderRef.current.start();
+                    setIsRecording(true);
+                    setStatus('🎤 Recording...');
+                } catch (err) {
+                    setStatus('❌ Microphone denied');
+                    console.error(err);
+                }
+            };
+
+            const stopRecording = () => {
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                    mediaRecorderRef.current.stop();
+                    setIsRecording(false);
+                    setIsProcessing(true);
+                    setStatus('⏳ Processing...');
+                }
+            };
+
+            return (
+                <div className="fixed bottom-8 right-8 z-50">
+                    <button
+                        onClick={isRecording ? stopRecording : startRecording}
+                        disabled={isProcessing}
+                        className={`w-24 h-24 rounded-full text-3xl font-bold transition-all flex items-center justify-center shadow-lg ${
+                            isRecording ? 'bg-red-600 animate-pulse' : isProcessing ? 'bg-gray-600 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600'
+                        }`}
+                    >
+                        {isProcessing ? '⏳' : isRecording ? '⏹️' : '🎤'}
+                    </button>
+                    {status && (
+                        <div className="absolute -top-20 right-0 bg-slate-800 text-white px-4 py-2 rounded text-sm whitespace-nowrap max-w-xs border border-slate-700">
+                            {status}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function App() {
+            const [tasks, setTasks] = useState([]);
+
+            return (
+                <div className="w-full h-screen bg-slate-950 text-slate-50 flex flex-col">
+                    <div className="border-b border-slate-800 p-4 bg-slate-900">
+                        <h1 className="text-2xl font-bold text-emerald-400">AI Command Center</h1>
+                        <p className="text-xs text-gray-500">Real-time Dispatch Dashboard</p>
+                    </div>
+                    <div className="flex-1 overflow-auto p-6">
+                        {tasks.length === 0 ? (
+                            <p className="text-gray-400">No tasks yet. Click 🎤 to speak.</p>
+                        ) : (
+                            <div className="space-y-4">
+                                {tasks.map((t) => (
+                                    <div key={t.id} className="bg-slate-800 border border-slate-700 rounded p-4">
+                                        <p className="text-sm text-gray-200">{t.description}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <VoiceRecorder onTaskCreated={(data) => {
+                        setTasks([{ id: Date.now(), description: data.transcription }, ...tasks]);
+                    }} />
+                </div>
+            );
+        }
+
+        try {
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<App />);
+        } catch (err) {
+            console.error('Render error:', err);
+            document.getElementById('root').innerHTML = '<div style="color: red; padding: 20px; font-family: mono;">Failed to load: ' + err.message + '</div>';
+        }
+    </script>
         const INTENTS = ['ORDER', 'STATUS_UPDATE', 'EMERGENCY', 'INQUIRY', 'ESCALATION'];
         const SOURCES = ['walkie-talkie', 'voip-phone'];
         const ZONES = ['Zone A', 'Zone B', 'Zone C', 'Warehouse'];
         const ITEMS = ['Forklift B', 'Pallet Jack', 'Inventory Box', 'Equipment Cart'];
         const LOCATIONS = ['Bay 1', 'Bay 2', 'Bay 3', 'Bay 4', 'Loading Dock', 'Storage'];
 
+        // Voice Recording Component
+        function VoiceRecorder({ onTaskCreated }) {
+            const [isRecording, setIsRecording] = useState(false);
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [recordingTime, setRecordingTime] = useState(0);
+            const mediaRecorderRef = React.useRef(null);
+            const streamRef = React.useRef(null);
+            const chunksRef = React.useRef([]);
+            const recordStartRef = React.useRef(null);
+            const timerRef = React.useRef(null);
+
+            const startRecording = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    streamRef.current = stream;
+                    
+                    const mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorderRef.current = mediaRecorder;
+                    chunksRef.current = [];
+                    recordStartRef.current = Date.now();
+                    setRecordingTime(0);
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        chunksRef.current.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        clearInterval(timerRef.current);
+                        const audioBlob = new Blob(chunksRef.current, { type: 'audio/wav' });
+                        await submitAudio(audioBlob);
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+
+                    mediaRecorder.start();
+                    setIsRecording(true);
+                    
+                    timerRef.current = setInterval(() => {
+                        setRecordingTime(Math.round((Date.now() - recordStartRef.current) / 1000));
+                    }, 100);
+                } catch (error) {
+                    console.error('Error accessing microphone:', error);
+                    alert('Could not access microphone. Please check permissions.');
+                }
+            };
+
+            const stopRecording = () => {
+                if (mediaRecorderRef.current && isRecording) {
+                    mediaRecorderRef.current.stop();
+                    setIsRecording(false);
+                }
+            };
+
+            const submitAudio = async (audioBlob) => {
+                setIsProcessing(true);
+                try {
+                    const formData = new FormData();
+                    formData.append('file', audioBlob, 'audio.wav');
+                    formData.append('speaker_id', 'voice_user');
+
+                    const response = await fetch('/mvp/voice', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    const result = await response.json();
+                    if (result.task) {
+                        onTaskCreated(result);
+                    } else if (result.status === 'error') {
+                        alert('Error: ' + result.message);
+                    }
+                } catch (error) {
+                    console.error('Error processing audio:', error);
+                    alert('Error processing audio: ' + error.message);
+                } finally {
+                    setIsProcessing(false);
+                }
+            };
+
+            return (
+                <div className="fixed bottom-6 right-6 z-40">
+                    {isRecording ? (
+                        <button
+                            onClick={stopRecording}
+                            disabled={isProcessing}
+                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold rounded-full pulse-orange flex items-center gap-2 shadow-lg"
+                        >
+                            <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                            STOP REC ({recordingTime}s)
+                        </button>
+                    ) : (
+                        <button
+                            onClick={startRecording}
+                            disabled={isProcessing}
+                            className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-600 text-white font-bold rounded-full shadow-lg flex items-center gap-2 text-lg"
+                        >
+                            🎤 {isProcessing ? 'PROCESSING...' : 'SPEAK'}
+                        </button>
+                    )}
+                </div>
+            );
+        }
+            const now = Date.now();
+            return {
+                id: `task-${Math.random().toString(36).substr(2, 9)}`,
+                transcription: `Requesting ${ITEMS[Math.floor(Math.random() * ITEMS.length)]} for ${LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]}`,
+                intent: INTENTS[Math.floor(Math.random() * INTENTS.length)],
+                priority: Math.random() > 0.7 ? 'high' : (Math.random() > 0.5 ? 'normal' : 'low'),
+                source: SOURCES[Math.floor(Math.random() * SOURCES.length)],
+                speaker: `Operator ${Math.floor(Math.random() * 10) + 1}`,
+                zone: ZONES[Math.floor(Math.random() * ZONES.length)],
+                extractedData: {
+                    item: ITEMS[Math.floor(Math.random() * ITEMS.length)],
+                    location: LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)],
+                },
+                confidence: (Math.random() * 0.4 + 0.6).toFixed(2),
+                timestamp: new Date(now).toISOString(),
+                createdAt: now,
+                requiresReview: Math.random() > 0.7,
+            };
+        }
         function generateMockTask() {
             const now = Date.now();
             return {
@@ -121,7 +380,6 @@
                 requiresReview: Math.random() > 0.7,
             };
         }
-
         // Waveform Component
         function AudioPulseHeader({ isTransmitting, totalOrders }) {
             return (
@@ -382,6 +640,28 @@
                 setSelectedReviewTask(task);
             };
 
+            const handleVoiceTaskCreated = (voiceResult) => {
+                if (voiceResult.task) {
+                    const task = {
+                        id: voiceResult.task.id,
+                        transcription: voiceResult.transcription || voiceResult.task.description,
+                        intent: voiceResult.classification?.intent_type || 'TASK',
+                        priority: voiceResult.task.priority || 'normal',
+                        source: 'voip-phone',
+                        speaker: 'Voice User',
+                        zone: 'Central',
+                        extractedData: voiceResult.task.extracted_entities || { item: 'Unknown', location: 'Unknown' },
+                        confidence: voiceResult.classification?.confidence || 0.5,
+                        timestamp: new Date().toISOString(),
+                        createdAt: Date.now(),
+                        requiresReview: voiceResult.requires_human_review || false,
+                    };
+                    setTasks(prev => [task, ...prev].slice(0, 12));
+                    setIsTransmitting(true);
+                    setTimeout(() => setIsTransmitting(false), 1500);
+                }
+            };
+
             const reviewTasks = tasks.filter(t => t.requiresReview);
             const activeTasks = tasks.filter(t => !t.requiresReview);
 
@@ -436,12 +716,28 @@
                     {selectedReviewTask && (
                         <ReviewModal task={selectedReviewTask} onClose={() => setSelectedReviewTask(null)} />
                     )}
+
+                    {/* Voice Recorder */}
+                    <VoiceRecorder onTaskCreated={handleVoiceTaskCreated} />
                 </div>
             );
         }
 
         // Render App
-        ReactDOM.createRoot(document.getElementById('root')).render(<AICommandCenter />);
+        try {
+            console.log('[RENDER] Starting to render AICommandCenter...');
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<AICommandCenter />);
+            console.log('[RENDER] Successfully rendered AICommandCenter');
+        } catch (error) {
+            console.error('[RENDER ERROR]', error);
+            document.getElementById('root').innerHTML = `
+                <div style="color: red; padding: 20px; font-family: monospace;">
+                    <h2>❌ React Rendering Error</h2>
+                    <pre>${error.message}\n${error.stack}</pre>
+                </div>
+            `;
+        }
     </script>
 </body>
 </html>

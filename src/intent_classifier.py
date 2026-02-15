@@ -121,7 +121,7 @@ class IntentClassifier:
     def __init__(
         self,
         provider: str = "huggingface",
-        model: str = "facebook/bart-large-mnli",
+        model: str = "valhalla/distilbart-mnli-12-1",
         temperature: float = 0.7,
         max_tokens: int = 500,
         timeout_ms: int = 1500
