@@ -536,27 +536,3 @@ pre-commit install
 
 Once running, visit: `http://localhost:8000/docs` (Swagger UI)
 
-## License
-
-MIT License - See LICENSE file
-
-## Support
-
-- 📧 Email: support@example.com
-- 🐛 Issues: GitHub Issues
-- 💬 Discussions: GitHub Discussions
-
-## Changelog
-
-### Version 1.0.0 (2024-01-15)
-- ✅ Initial release
-- ✅ Multi-source audio input support
-- ✅ Real-time transcription with Whisper
-- ✅ Intent classification with GPT-4 Turbo
-- ✅ Task prioritization and assignment
-- ✅ Multi-channel notifications
-- ✅ Webhook handlers for Twilio/Vonage
-
----
-
-**Built with ❤️ for real-time communication intelligence**
