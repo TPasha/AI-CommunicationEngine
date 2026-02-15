@@ -14,8 +14,8 @@ aiofiles==23.2.1
 # AI/ML Services
 openai==1.0.0
 transformers==4.35.2
-torch==2.1.1
-torchaudio==2.1.1
+torch==2.10.0
+torchaudio==2.10.0
 SpeechRecognition==3.10.0
 pydub==0.25.1
 
@@ -31,6 +31,7 @@ firebase-admin==6.2.0
 python-dotenv==1.0.0
 python-multipart==0.0.6
 python-jose[cryptography]==3.3.0
+slowapi==0.1.9
 
 # Logging
 loguru==0.7.2

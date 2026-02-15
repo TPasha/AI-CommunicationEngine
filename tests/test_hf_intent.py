@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 # Add src to path for proper module resolution
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from intent_classifier import IntentClassifier
 

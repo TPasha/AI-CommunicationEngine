@@ -18,17 +18,21 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from src.intent_classifier import IntentClassifier, IntentType
+from .intent_classifier import IntentClassifier, IntentType
 
 app = FastAPI(title="AI Communication Engine - MVP", version="0.1.0")
 
 classifier = IntentClassifier()
 
 # Mount static files and templates
-static_dir = os.path.join(os.path.dirname(__file__), "static")
+web_dir = os.path.join(ROOT, "web")
+static_dir = os.path.join(web_dir, "static")
 if os.path.isdir(static_dir):
     app.mount("/mvp/static", StaticFiles(directory=static_dir), name="mvp_static")
-templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
+    
+templates_dir = os.path.join(web_dir, "templates")
+if os.path.isdir(templates_dir):
+    templates = Jinja2Templates(directory=templates_dir)
 
 # Simple in-memory pub/sub for notifications (SSE)
 import asyncio
@@ -46,7 +50,8 @@ async def _publish(message: str):
 
 
 # Simple SQLite persistence for notifications
-DB_PATH = os.path.join(os.path.dirname(__file__), "mvp_notifications.db")
+DB_PATH = os.path.join(ROOT, "web", "mvp_notifications.db")
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 def _get_db_connection():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
@@ -139,12 +144,6 @@ async def process(req: ProcessRequest):
     return {"status": "ok", "result": result}
 
 
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("mvp.app:app", host="127.0.0.1", port=8800, reload=True)
-
-
 @app.post("/mvp/notify")
 async def notify(payload: dict, background_tasks: BackgroundTasks):
     """Receive a notification (e.g., a created task) and publish to connected UI clients."""
@@ -189,10 +188,12 @@ async def stream():
 
 def _load_index_html():
     """Load index.html with proper UTF-8 encoding."""
-    templates_dir = os.path.join(os.path.dirname(__file__), "templates")
+    templates_dir = os.path.join(ROOT, "web", "templates")
     index_path = os.path.join(templates_dir, "index.html")
-    with open(index_path, "r", encoding="utf-8") as f:
-        return f.read()
+    if os.path.exists(index_path):
+        with open(index_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return "<html><body><h1>AI Communication Engine</h1></body></html>"
 
 
 @app.get("/")
@@ -221,3 +222,8 @@ async def catch_all(full_path: str):
             "available_endpoints": ["/", "/mvp", "/mvp/ui", "/mvp/health", "/mvp/stream", "/mvp/notify", "/mvp/history"]
         }
     )
+
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("src.web_app:app", host="127.0.0.1", port=8800, reload=True)

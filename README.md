@@ -32,18 +32,22 @@ cd "d:\AI Communication Engine"
 
 ### 2. Virtual Environment Setup
 
-```bash
-# Create virtual environment
-python -m venv venv
+The virtual environment is stored outside the project at `d:\venv_aice` for better organization.
 
+```bash
 # Activate (Windows PowerShell)
-.\venv\Scripts\Activate.ps1
+& "d:\venv_aice\Scripts\Activate.ps1"
 
 # Activate (Command Prompt)
-.\venv\Scripts\activate.bat
+d:\venv_aice\Scripts\activate.bat
 
 # Activate (macOS/Linux)
-source venv/bin/activate
+source /path/to/venv_aice/bin/activate
+```
+
+Or use the venv Python executable directly:
+```bash
+d:\venv_aice\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
 ### 3. Install Dependencies
@@ -74,12 +78,17 @@ python -c "from src.models import init_db; init_db()"
 
 ### 6. Run the Service
 
-#### Option A: Using Uvicorn (Recommended)
+#### Option A: Using Uvicorn (Recommended - Main Engine)
 ```bash
 uvicorn src.AI-CommunicationEngine:app --reload --host 0.0.0.0 --port 8000
 ```
 
-#### Option B: Direct Python
+#### Option B: Web Dashboard (MVP)
+```bash
+uvicorn src.web_app:app --reload --host 127.0.0.1 --port 8800
+```
+
+#### Option C: Direct Python
 ```bash
 python src/AI-CommunicationEngine.py
 ```
@@ -87,11 +96,14 @@ python src/AI-CommunicationEngine.py
 ### 7. Test the Service
 
 ```bash
-# Run demo script
-python mvp/demo.py
-
 # Run integration tests
 pytest tests/test_integration.py -v
+
+# Run Hugging Face integration tests
+pytest tests/test_huggingface_integration.py -v
+
+# Run all tests
+pytest tests/ -v
 
 # Check health endpoint
 curl http://localhost:8000/health
