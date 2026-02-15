@@ -189,48 +189,55 @@ class TranscriptionService:
         speaker_id: Optional[str] = None
     ) -> Optional[TranscriptionResult]:
         """Transcribe using Hugging Face Whisper model"""
+        temp_file = None
         try:
-            # Try to load audio using librosa (handles WebM, MP3, etc.)
+            import tempfile
+            import os
+            
+            # Get ffmpeg from imageio-ffmpeg package
+            try:
+                import imageio_ffmpeg
+                ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
+                os.environ['FFMPEG_BINARY'] = ffmpeg_path
+                logger.info(f"Using ffmpeg from: {ffmpeg_path}")
+            except ImportError:
+                logger.warning("imageio-ffmpeg not available, using system ffmpeg")
+            
+            # Save audio to temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as f:
+                temp_file = f.name
+                f.write(audio_data)
+            
+            logger.info(f"Processing audio: {temp_file} ({len(audio_data)} bytes)")
+            
+            # Try using librosa with ffmpeg
             try:
                 import librosa
                 import numpy as np
                 
-                # Load audio from bytes
-                y, sr = librosa.load(io.BytesIO(audio_data), sr=16000, mono=True)
-                logger.info(f"Loaded audio using librosa: {len(y)} samples at {sr}Hz")
+                # Load and resample audio
+                y, sr = await asyncio.to_thread(librosa.load, temp_file, sr=16000, mono=True)
+                logger.info(f"Loaded audio: {len(y)} samples at {sr}Hz")
                 
-                # Convert to the format Whisper expects
-                # The pipeline can accept numpy arrays
+                # Run Whisper pipeline with numpy array
                 response = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        self.hf_pipeline,
-                        y,
-                        sampling_rate=sr,
-                        language=self.language if self.language != "en" else None
-                    ),
+                    asyncio.to_thread(self.hf_pipeline, y, sampling_rate=sr),
                     timeout=self.timeout_seconds
                 )
-            except ImportError:
-                # Fallback: try using io.BytesIO directly
-                logger.warning("librosa not available, trying direct BytesIO")
-                audio_file = io.BytesIO(audio_data)
-                
+            except Exception as e:
+                logger.warning(f"Librosa failed ({e}), trying pipeline directly on file")
+                # Fallback: let pipeline handle the file
                 response = await asyncio.wait_for(
-                    asyncio.to_thread(
-                        self.hf_pipeline,
-                        audio_file,
-                        language=self.language if self.language != "en" else None
-                    ),
+                    asyncio.to_thread(self.hf_pipeline, temp_file),
                     timeout=self.timeout_seconds
                 )
             
             text = response.get("text", "").strip()
             
             if not text:
-                logger.warning("Empty transcription result from Hugging Face")
+                logger.warning("Empty transcription result")
                 return None
             
-            # Hugging Face doesn't provide confidence scores, use default
             result = TranscriptionResult(
                 text=text,
                 confidence=0.85,
@@ -239,14 +246,20 @@ class TranscriptionService:
                 metadata={"provider": "huggingface_whisper", "model": self.model}
             )
             
-            logger.info(f"Transcribed {len(text)} chars from speaker {speaker_id} using Hugging Face")
+            logger.info(f"✅ Transcribed: '{text}'")
             return result
-        
-        except asyncio.TimeoutError:
-            raise
+            
         except Exception as e:
-            logger.error(f"Hugging Face Whisper error: {str(e)}")
+            logger.error(f"Transcription error: {str(e)}", exc_info=True)
             return None
+            
+        finally:
+            # Clean up temp file
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.unlink(temp_file)
+                except Exception as e:
+                    logger.warning(f"Could not delete temp file: {e}")
     
     def get_supported_languages(self) -> list:
         """Get list of supported languages"""
