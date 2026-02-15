@@ -114,6 +114,10 @@ class EntityExtractor:
 class IntentClassifier:
     """Main intent classification service"""
     
+    # Configuration constants
+    MAX_TEXT_LENGTH = 10000
+    MIN_TEXT_LENGTH = 1
+    
     def __init__(
         self,
         provider: str = "huggingface",
@@ -164,7 +168,21 @@ class IntentClassifier:
             
         Returns:
             IntentClassification or None
+            
+        Raises:
+            ValueError: If text validation fails
         """
+        # Input validation
+        if not isinstance(text, str):
+            raise ValueError(f"Text must be a string, got {type(text)}")
+        
+        if len(text) < self.MIN_TEXT_LENGTH:
+            raise ValueError(f"Text must be at least {self.MIN_TEXT_LENGTH} character")
+        
+        if len(text) > self.MAX_TEXT_LENGTH:
+            logger.warning(f"Text exceeds max length ({len(text)} > {self.MAX_TEXT_LENGTH}), truncating")
+            text = text[:self.MAX_TEXT_LENGTH]
+        
         try:
             if self.provider == LLMProvider.OPENAI_GPT:
                 if not HAS_OPENAI:
@@ -182,6 +200,9 @@ class IntentClassifier:
         except asyncio.TimeoutError:
             logger.error(f"Intent classification timeout for speaker {speaker_id}")
             return None
+        except ValueError as e:
+            logger.error(f"Intent classification validation error: {str(e)}")
+            raise
         except Exception as e:
             logger.error(f"Classification error: {str(e)}")
             return self._classify_with_rules(text, context)

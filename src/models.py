@@ -149,6 +149,7 @@ class StaffMember(Base):
     name = Column(String(255), nullable=False)
     role = Column(String(255), nullable=False)
     department = Column(String(255), nullable=False)
+    email = Column(String(255), nullable=True)
     phone_number = Column(String(20), nullable=True)
     device_token = Column(String(500), nullable=True)
     

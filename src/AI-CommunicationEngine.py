@@ -254,7 +254,20 @@ init_db()
 
 # Load configuration
 config = configparser.ConfigParser()
-config.read("config.ini")
+if not config.read("config.ini"):
+    raise FileNotFoundError("config.ini not found - required for application startup")
+
+# Validate required configuration
+required_configs = [
+    ("transcription", "provider"),
+    ("transcription", "model"),
+    ("intent_classification", "provider"),
+    ("intent_classification", "model"),
+]
+
+for section, option in required_configs:
+    if not config.has_option(section, option):
+        raise ValueError(f"Missing required configuration: [{section}] {option}")
 
 # Initialize middleware
 middleware = CommunicationMiddleware(config)
@@ -279,11 +292,22 @@ webhook_router = WebhookRouter(
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint with dependency verification"""
+    checks = {
+        "transcription_service": middleware.transcription_service is not None,
+        "intent_classifier": middleware.intent_classifier is not None,
+        "notification_service": middleware.notification_service is not None,
+        "transcription_model_loaded": hasattr(middleware.transcription_service, 'hf_pipeline') if middleware.transcription_service else False,
+    }
+    
+    all_healthy = all(checks.values())
+    status = "healthy" if all_healthy else "degraded"
+    
     return {
-        "status": "healthy",
+        "status": status,
         "service": "AI Communication Engine",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
+        "dependency_checks": checks
     }
 
 

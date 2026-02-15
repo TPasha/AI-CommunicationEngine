@@ -13,9 +13,9 @@ aiofiles==23.2.1
 
 # AI/ML Services
 openai==1.0.0
-transformers>=4.25.0
-torch>=2.0.0
-torchaudio>=2.0.0
+transformers==4.35.2
+torch==2.1.1
+torchaudio==2.1.1
 SpeechRecognition==3.10.0
 pydub==0.25.1
 
@@ -36,7 +36,7 @@ python-jose[cryptography]==3.3.0
 loguru==0.7.2
 
 # Audio Processing - Python 3.12 Compatible
-numpy>=1.26.0
+numpy==1.26.3
 librosa==0.10.0
 
 # Testing
@@ -48,6 +48,9 @@ httpx==0.25.1
 black==23.11.0
 flake8==6.1.0
 mypy==1.7.0
+
+# Security & Rate Limiting
+slowapi==0.1.9
 pre-commit==3.5.0
 
 # Caching

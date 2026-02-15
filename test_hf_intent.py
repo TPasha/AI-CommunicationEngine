@@ -6,7 +6,9 @@ import asyncio
 import sys
 from pathlib import Path
 
+# Add src to path for proper module resolution
 sys.path.insert(0, str(Path(__file__).parent / "src"))
+
 from intent_classifier import IntentClassifier
 
 async def test_hf_intent():
