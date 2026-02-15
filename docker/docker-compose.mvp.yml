@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  mvp_demo:
+    build:
+      context: ./mvp
+      dockerfile: Dockerfile
+    container_name: ai_engine_mvp_demo
+    ports:
+      - "8830:8830"
+    restart: unless-stopped
+    volumes:
+      - ./mvp:/app:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8830/mvp/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3

@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Command Center - Real-time Dispatch</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/framer-motion@10.16.4/dist/framer-motion.esm.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { --font-mono: 'JetBrains Mono', monospace; }
+        body { font-family: 'JetBrains Mono', monospace; }
+        .pulse-glow { animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 0.6; box-shadow: 0 0 20px rgba(34, 197, 94, 0.3); }
+            50% { opacity: 1; box-shadow: 0 0 40px rgba(34, 197, 94, 0.6); }
+        }
+        .pulse-orange { animation: pulse-orange 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse-orange {
+            0%, 100% { opacity: 0.6; box-shadow: 0 0 20px rgba(249, 115, 22, 0.3); }
+            50% { opacity: 1; box-shadow: 0 0 40px rgba(249, 115, 22, 0.6); }
+        }
+        .waveform {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            height: 40px;
+        }
+        .waveform-bar {
+            width: 3px;
+            background: #9ca3af;
+            border-radius: 2px;
+            animation: wave-idle 0.6s ease-in-out infinite;
+        }
+        .waveform-bar:nth-child(1) { animation-delay: -0.36s; }
+        .waveform-bar:nth-child(2) { animation-delay: -0.24s; }
+        .waveform-bar:nth-child(3) { animation-delay: -0.12s; }
+        .waveform.active .waveform-bar {
+            background: #06b6d4;
+            animation: wave-active 0.6s ease-in-out infinite;
+        }
+        @keyframes wave-idle {
+            0%, 100% { height: 8px; }
+            50% { height: 12px; }
+        }
+        @keyframes wave-active {
+            0%, 100% { height: 8px; }
+            25% { height: 24px; }
+            50% { height: 32px; }
+            75% { height: 24px; }
+        }
+        .typing-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.2em;
+            background: #06b6d4;
+            animation: blink 1s infinite;
+            margin-left: 4px;
+        }
+        @keyframes blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+        .countdown {
+            font-variant-numeric: tabular-nums;
+        }
+        .card-priority-high { box-shadow: 0 0 20px rgba(239, 68, 68, 0.4), inset 0 0 1px rgba(239, 68, 68, 0.6); border: 1px solid rgba(239, 68, 68, 0.3); }
+        .card-priority-normal { box-shadow: 0 0 15px rgba(59, 130, 246, 0.3), inset 0 0 1px rgba(59, 130, 246, 0.5); border: 1px solid rgba(59, 130, 246, 0.2); }
+        .card-priority-review { box-shadow: 0 0 20px rgba(249, 115, 22, 0.5), inset 0 0 1px rgba(249, 115, 22, 0.6); border: 2px solid rgba(249, 115, 22, 0.8); animation: pulse-review 1.5s ease-in-out infinite; }
+        @keyframes pulse-review {
+            0%, 100% { box-shadow: 0 0 20px rgba(249, 115, 22, 0.5), inset 0 0 1px rgba(249, 115, 22, 0.6); }
+            50% { box-shadow: 0 0 35px rgba(249, 115, 22, 0.8), inset 0 0 1px rgba(249, 115, 22, 0.8); }
+        }
+        .modal-overlay { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-content { animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .fade-in-text { animation: fadeInText 0.5s ease-out; }
+        @keyframes fadeInText { from { opacity: 0; } to { opacity: 1; } }
+        @media (max-width: 768px) {
+            .desktop-only { display: none; }
+            .mobile-feed { position: fixed; bottom: 0; left: 0; right: 0; height: 50vh; z-index: 40; }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-50 overflow-hidden">
+    <div id="root" class="w-full h-screen flex flex-col">
+        <div style="display: flex; align-items: center; justify-content: center; height: 100vh; color: #888;">
+            <p>Loading AI Command Center...</p>
+        </div>
+    </div>
+
+    <script>
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            console.error('ERROR:', msg, 'at line', lineNo);
+            document.getElementById('root').innerHTML = `
+                <div style="color: #ef4444; padding: 40px; font-family: monospace;">
+                    <h2>❌ Error Loading Dashboard</h2>
+                    <p>${msg}</p>
+                    <p style="color: #888; font-size: 12px;">Check browser console for details</p>
+                </div>
+            `;
+            return true;
+        };
+    </script>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <script type="text/babel">
+        const { useState, useRef } = React;
+
+        function VoiceRecorder({ onTaskCreated }) {
+            const [isRecording, setIsRecording] = useState(false);
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [status, setStatus] = useState('');
+            const mediaRecorderRef = useRef(null);
+            const chunksRef = useRef([]);
+
+            const startRecording = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    chunksRef.current = [];
+                    mediaRecorderRef.current = new MediaRecorder(stream);
+                    
+                    mediaRecorderRef.current.ondataavailable = (e) => {
+                        chunksRef.current.push(e.data);
+                    };
+                    
+                    mediaRecorderRef.current.onstop = async () => {
+                        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+                        if (blob.size === 0) {
+                            setStatus('❌ No audio recorded');
+                            setIsProcessing(false);
+                            return;
+                        }
+                        
+                        const formData = new FormData();
+                        formData.append('file', blob, 'recording.webm');
+                        
+                        try {
+                            const res = await fetch('/mvp/voice', { method: 'POST', body: formData });
+                            const data = await res.json();
+                            
+                            if (!res.ok) {
+                                setStatus(`❌ ${data.message || 'Server error'}`);
+                            } else {
+                                const text = data.transcription || '(no speech detected)';
+                                setStatus(`✅ "${text}"`);
+                                if (onTaskCreated) onTaskCreated(data);
+                                setTimeout(() => setStatus(''), 3000);
+                            }
+                        } catch (err) {
+                            setStatus(`❌ ${err.message}`);
+                        } finally {
+                            setIsProcessing(false);
+                        }
+                    };
+                    
+                    mediaRecorderRef.current.start();
+                    setIsRecording(true);
+                    setStatus('🎤 Recording...');
+                } catch (err) {
+                    setStatus('❌ Microphone denied');
+                    console.error(err);
+                }
+            };
+
+            const stopRecording = () => {
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                    mediaRecorderRef.current.stop();
+                    setIsRecording(false);
+                    setIsProcessing(true);
+                    setStatus('⏳ Processing...');
+                }
+            };
+
+            return (
+                <div className="fixed bottom-8 right-8 z-50">
+                    <button
+                        onClick={isRecording ? stopRecording : startRecording}
+                        disabled={isProcessing}
+                        className={`w-24 h-24 rounded-full text-3xl font-bold transition-all flex items-center justify-center shadow-lg ${
+                            isRecording ? 'bg-red-600 animate-pulse' : isProcessing ? 'bg-gray-600 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600'
+                        }`}
+                    >
+                        {isProcessing ? '⏳' : isRecording ? '⏹️' : '🎤'}
+                    </button>
+                    {status && (
+                        <div className="absolute -top-20 right-0 bg-slate-800 text-white px-4 py-2 rounded text-sm whitespace-nowrap max-w-xs border border-slate-700">
+                            {status}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        function App() {
+            const [tasks, setTasks] = useState([]);
+
+            return (
+                <div className="w-full h-screen bg-slate-950 text-slate-50 flex flex-col">
+                    <div className="border-b border-slate-800 p-4 bg-slate-900">
+                        <h1 className="text-2xl font-bold text-emerald-400">AI Command Center</h1>
+                        <p className="text-xs text-gray-500">Real-time Dispatch Dashboard</p>
+                    </div>
+                    <div className="flex-1 overflow-auto p-6">
+                        {tasks.length === 0 ? (
+                            <p className="text-gray-400">No tasks yet. Click 🎤 to speak.</p>
+                        ) : (
+                            <div className="space-y-4">
+                                {tasks.map((t) => (
+                                    <div key={t.id} className="bg-slate-800 border border-slate-700 rounded p-4">
+                                        <p className="text-sm text-gray-200">{t.description}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <VoiceRecorder onTaskCreated={(data) => {
+                        setTasks([{ id: Date.now(), description: data.transcription }, ...tasks]);
+                    }} />
+                </div>
+            );
+        }
+
+        try {
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<App />);
+        } catch (err) {
+            console.error('Render error:', err);
+            document.getElementById('root').innerHTML = '<div style="color: red; padding: 20px; font-family: mono;">Failed to load: ' + err.message + '</div>';
+        }
+    </script>
+        const INTENTS = ['ORDER', 'STATUS_UPDATE', 'EMERGENCY', 'INQUIRY', 'ESCALATION'];
+        const SOURCES = ['walkie-talkie', 'voip-phone'];
+        const ZONES = ['Zone A', 'Zone B', 'Zone C', 'Warehouse'];
+        const ITEMS = ['Forklift B', 'Pallet Jack', 'Inventory Box', 'Equipment Cart'];
+        const LOCATIONS = ['Bay 1', 'Bay 2', 'Bay 3', 'Bay 4', 'Loading Dock', 'Storage'];
+
+        // Voice Recording Component
+        function VoiceRecorder({ onTaskCreated }) {
+            const [isRecording, setIsRecording] = useState(false);
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [recordingTime, setRecordingTime] = useState(0);
+            const mediaRecorderRef = React.useRef(null);
+            const streamRef = React.useRef(null);
+            const chunksRef = React.useRef([]);
+            const recordStartRef = React.useRef(null);
+            const timerRef = React.useRef(null);
+
+            const startRecording = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    streamRef.current = stream;
+                    
+                    const mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorderRef.current = mediaRecorder;
+                    chunksRef.current = [];
+                    recordStartRef.current = Date.now();
+                    setRecordingTime(0);
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        chunksRef.current.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        clearInterval(timerRef.current);
+                        const audioBlob = new Blob(chunksRef.current, { type: 'audio/wav' });
+                        await submitAudio(audioBlob);
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+
+                    mediaRecorder.start();
+                    setIsRecording(true);
+                    
+                    timerRef.current = setInterval(() => {
+                        setRecordingTime(Math.round((Date.now() - recordStartRef.current) / 1000));
+                    }, 100);
+                } catch (error) {
+                    console.error('Error accessing microphone:', error);
+                    alert('Could not access microphone. Please check permissions.');
+                }
+            };
+
+            const stopRecording = () => {
+                if (mediaRecorderRef.current && isRecording) {
+                    mediaRecorderRef.current.stop();
+                    setIsRecording(false);
+                }
+            };
+
+            const submitAudio = async (audioBlob) => {
+                setIsProcessing(true);
+                try {
+                    const formData = new FormData();
+                    formData.append('file', audioBlob, 'audio.wav');
+                    formData.append('speaker_id', 'voice_user');
+
+                    const response = await fetch('/mvp/voice', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    const result = await response.json();
+                    if (result.task) {
+                        onTaskCreated(result);
+                    } else if (result.status === 'error') {
+                        alert('Error: ' + result.message);
+                    }
+                } catch (error) {
+                    console.error('Error processing audio:', error);
+                    alert('Error processing audio: ' + error.message);
+                } finally {
+                    setIsProcessing(false);
+                }
+            };
+
+            return (
+                <div className="fixed bottom-6 right-6 z-40">
+                    {isRecording ? (
+                        <button
+                            onClick={stopRecording}
+                            disabled={isProcessing}
+                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-bold rounded-full pulse-orange flex items-center gap-2 shadow-lg"
+                        >
+                            <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                            STOP REC ({recordingTime}s)
+                        </button>
+                    ) : (
+                        <button
+                            onClick={startRecording}
+                            disabled={isProcessing}
+                            className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-600 text-white font-bold rounded-full shadow-lg flex items-center gap-2 text-lg"
+                        >
+                            🎤 {isProcessing ? 'PROCESSING...' : 'SPEAK'}
+                        </button>
+                    )}
+                </div>
+            );
+        }
+            const now = Date.now();
+            return {
+                id: `task-${Math.random().toString(36).substr(2, 9)}`,
+                transcription: `Requesting ${ITEMS[Math.floor(Math.random() * ITEMS.length)]} for ${LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]}`,
+                intent: INTENTS[Math.floor(Math.random() * INTENTS.length)],
+                priority: Math.random() > 0.7 ? 'high' : (Math.random() > 0.5 ? 'normal' : 'low'),
+                source: SOURCES[Math.floor(Math.random() * SOURCES.length)],
+                speaker: `Operator ${Math.floor(Math.random() * 10) + 1}`,
+                zone: ZONES[Math.floor(Math.random() * ZONES.length)],
+                extractedData: {
+                    item: ITEMS[Math.floor(Math.random() * ITEMS.length)],
+                    location: LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)],
+                },
+                confidence: (Math.random() * 0.4 + 0.6).toFixed(2),
+                timestamp: new Date(now).toISOString(),
+                createdAt: now,
+                requiresReview: Math.random() > 0.7,
+            };
+        }
+        function generateMockTask() {
+            const now = Date.now();
+            return {
+                id: `task-${Math.random().toString(36).substr(2, 9)}`,
+                transcription: `Requesting ${ITEMS[Math.floor(Math.random() * ITEMS.length)]} for ${LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]}`,
+                intent: INTENTS[Math.floor(Math.random() * INTENTS.length)],
+                priority: Math.random() > 0.7 ? 'high' : (Math.random() > 0.5 ? 'normal' : 'low'),
+                source: SOURCES[Math.floor(Math.random() * SOURCES.length)],
+                speaker: `Operator ${Math.floor(Math.random() * 10) + 1}`,
+                zone: ZONES[Math.floor(Math.random() * ZONES.length)],
+                extractedData: {
+                    item: ITEMS[Math.floor(Math.random() * ITEMS.length)],
+                    location: LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)],
+                },
+                confidence: (Math.random() * 0.4 + 0.6).toFixed(2),
+                timestamp: new Date(now).toISOString(),
+                createdAt: now,
+                requiresReview: Math.random() > 0.7,
+            };
+        }
+        // Waveform Component
+        function AudioPulseHeader({ isTransmitting, totalOrders }) {
+            return (
+                <div className="bg-slate-900/80 backdrop-blur border-b border-slate-800 px-6 py-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className={`waveform ${isTransmitting ? 'active' : ''}`}>
+                                {[1, 2, 3, 4, 5].map(i => <div key={i} className="waveform-bar"></div>)}
+                            </div>
+                            <div>
+                                <div className="text-sm font-bold text-gray-400 tracking-wider">SYSTEM PULSE</div>
+                                <div className={`text-xl font-bold ${isTransmitting ? 'text-cyan-400' : 'text-gray-600'}`}>
+                                    {isTransmitting ? 'TRANSMITTING' : 'STANDBY'}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-sm font-bold text-gray-400 tracking-wider">TOTAL ORDERS</div>
+                            <div className="text-4xl font-bold text-emerald-400">{totalOrders}</div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Intent Badge Component
+        function IntentBadge({ intent, confidence }) {
+            const colors = {
+                'ORDER': 'bg-blue-900/50 border-blue-500/30 text-blue-300',
+                'STATUS_UPDATE': 'bg-slate-700/50 border-slate-500/30 text-slate-300',
+                'EMERGENCY': 'bg-red-900/50 border-red-500/30 text-red-300',
+                'INQUIRY': 'bg-purple-900/50 border-purple-500/30 text-purple-300',
+                'ESCALATION': 'bg-orange-900/50 border-orange-500/30 text-orange-300',
+            };
+            return (
+                <div className="flex items-center gap-2">
+                    <div className={`px-2 py-1 rounded text-xs font-bold border ${colors[intent] || colors['INQUIRY']} tracking-wider`}>
+                        [{intent}]
+                    </div>
+                    <div className="text-xs text-gray-400">
+                        {Math.round(confidence * 100)}% confidence
+                    </div>
+                </div>
+            );
+        }
+
+        // Live Feed Component (The Wire)
+        function LiveFeed({ transmissions, isTransmitting }) {
+            const feedRef = useRef(null);
+            useEffect(() => {
+                if (feedRef.current) {
+                    feedRef.current.scrollTop = 0;
+                }
+            }, [transmissions]);
+
+            return (
+                <div className="desktop-only h-full flex flex-col bg-slate-900/30 border-r border-slate-800">
+                    <div className="px-4 py-3 border-b border-slate-800">
+                        <h2 className="text-sm font-bold text-cyan-400 tracking-wider">THE WIRE</h2>
+                        <p className="text-xs text-gray-500 mt-1">Raw Transcriptions</p>
+                    </div>
+                    <div ref={feedRef} className="flex-1 overflow-y-auto space-y-2 p-3">
+                        {transmissions.length === 0 ? (
+                            <div className="text-center text-gray-600 text-sm mt-8">
+                                <p>Waiting for transmissions...</p>
+                            </div>
+                        ) : (
+                            transmissions.map((transmission, idx) => (
+                                <div key={idx} className="bg-slate-800/50 border-l-2 border-cyan-500/30 pl-3 py-2 text-xs text-gray-300 fade-in-text font-mono">
+                                    <div className="text-gray-500">[{new Date(transmission.timestamp).toLocaleTimeString()}]</div>
+                                    <div className="mt-1 text-cyan-300/80">{transmission.text}
+                                        {transmission.isTyping && <span className="typing-cursor"></span>}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Task Card Component
+        function TaskCard({ task, onPlayAudio, onReview }) {
+            const [elapsedTime, setElapsedTime] = useState(0);
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setElapsedTime(Math.floor((Date.now() - task.createdAt) / 1000));
+                }, 1000);
+                return () => clearInterval(interval);
+            }, [task.createdAt]);
+
+            const formatTime = (seconds) => {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins}m ${secs}s`;
+            };
+
+            const priorityClass = task.requiresReview ? 'card-priority-review' : 
+                                 (task.priority === 'high' ? 'card-priority-high' : 'card-priority-normal');
+
+            return (
+                <div className={`bg-slate-900/50 rounded-lg p-4 ${priorityClass} fade-in-text`}>
+                    <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            {task.source === 'walkie-talkie' ? (
+                                <svg className="w-5 h-5 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+                            ) : (
+                                <svg className="w-5 h-5 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.823.9a16.066 16.066 0 0011.268 11.268l.9-1.823a1 1 0 011.06-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>
+                            )}
+                            <IntentBadge intent={task.intent} confidence={task.confidence} />
+                        </div>
+                        {task.requiresReview && (
+                            <div className="px-2 py-1 bg-orange-900/70 border border-orange-500 rounded text-xs font-bold text-orange-300 tracking-widest">
+                                REVIEW
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="mb-3">
+                        <p className="text-sm text-slate-200 mb-2">{task.transcription}</p>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div><span className="text-gray-500">Item:</span> <span className="text-emerald-400 font-mono">{task.extractedData.item}</span></div>
+                            <div><span className="text-gray-500">Location:</span> <span className="text-emerald-400 font-mono">{task.extractedData.location}</span></div>
+                            <div><span className="text-gray-500">Zone:</span> <span className="text-cyan-400 font-mono">{task.zone}</span></div>
+                            <div><span className="text-gray-500">Operator:</span> <span className="text-cyan-400 font-mono">{task.speaker}</span></div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-700">
+                        <div className="text-xs text-gray-500 countdown">
+                            ⏱ {formatTime(elapsedTime)}
+                        </div>
+                        <div className="flex gap-2">
+                            {task.requiresReview && (
+                                <button onClick={() => onReview(task)} className="px-2 py-1 text-xs bg-orange-900/50 hover:bg-orange-900/80 border border-orange-500/50 text-orange-300 rounded font-bold transition">
+                                    REVIEW
+                                </button>
+                            )}
+                            <button onClick={() => onPlayAudio(task)} className="px-2 py-1 text-xs bg-cyan-900/50 hover:bg-cyan-900/80 border border-cyan-500/50 text-cyan-300 rounded font-bold transition">
+                                AUDIO
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Modal Component
+        function ReviewModal({ task, onClose }) {
+            if (!task) return null;
+            return (
+                <div className="modal-overlay fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                    <div className="modal-content bg-slate-900 border border-orange-500/50 rounded-lg p-6 max-w-md w-full mx-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-orange-400">HUMAN REVIEW REQUIRED</h3>
+                            <button onClick={onClose} className="text-gray-500 hover:text-gray-300">✕</button>
+                        </div>
+                        <div className="space-y-3 text-sm">
+                            <div>
+                                <div className="text-gray-400 tracking-wider">ORIGINAL TRANSCRIPTION</div>
+                                <div className="text-slate-300 font-mono mt-1 bg-slate-800/50 p-2 rounded">{task.transcription}</div>
+                            </div>
+                            <div>
+                                <div className="text-gray-400 tracking-wider">AI CONFIDENCE</div>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex-1 bg-slate-800 h-2 rounded-full overflow-hidden">
+                                        <div className="bg-orange-500 h-full" style={{ width: `${task.confidence * 100}%` }}></div>
+                                    </div>
+                                    <div className="font-mono">{Math.round(task.confidence * 100)}%</div>
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-gray-400 tracking-wider">AI CLASSIFICATION</div>
+                                <div className="text-orange-300 font-mono mt-1">[{task.intent}]</div>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 pt-4 border-t border-slate-700">
+                            <button onClick={onClose} className="flex-1 px-4 py-2 bg-emerald-900/50 hover:bg-emerald-900/80 text-emerald-400 font-bold rounded transition">
+                                CONFIRM
+                            </button>
+                            <button onClick={onClose} className="flex-1 px-4 py-2 bg-red-900/50 hover:bg-red-900/80 text-red-400 font-bold rounded transition">
+                                REJECT
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Main Dashboard Component
+        function AICommandCenter() {
+            const [tasks, setTasks] = useState([]);
+            const [transmissions, setTransmissions] = useState([]);
+            const [isTransmitting, setIsTransmitting] = useState(false);
+            const [selectedReviewTask, setSelectedReviewTask] = useState(null);
+            const [totalOrders] = useState(tasks.length);
+
+            // Simulate SSE stream
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    if (Math.random() > 0.6) {
+                        const newTask = generateMockTask();
+                        setTasks(prev => [newTask, ...prev].slice(0, 12));
+                        
+                        setIsTransmitting(true);
+                        setTransmissions(prev => [{
+                            text: newTask.transcription,
+                            timestamp: newTask.timestamp,
+                            isTyping: true,
+                        }, ...prev].slice(0, 20));
+                        
+                        setTimeout(() => {
+                            setIsTransmitting(false);
+                            setTransmissions(prev => 
+                                prev.map((t, idx) => idx === 0 ? { ...t, isTyping: false } : t)
+                            );
+                        }, 2000);
+                    }
+                }, 3000);
+                return () => clearInterval(interval);
+            }, []);
+
+            // Real SSE connection (when backend is ready)
+            useEffect(() => {
+                const es = new EventSource('/mvp/stream');
+                es.onmessage = (evt) => {
+                    try {
+                        const data = JSON.parse(evt.data);
+                        if (data.id || data.description) {
+                            const task = {
+                                id: data.id || `task-${Date.now()}`,
+                                transcription: data.description || 'Task from system',
+                                intent: data.intent || 'ORDER',
+                                priority: data.priority || 'normal',
+                                source: 'voip-phone',
+                                speaker: 'System',
+                                zone: 'Central',
+                                extractedData: data.extracted_entities || { item: 'Item', location: 'Location' },
+                                confidence: Math.random() * 0.4 + 0.6,
+                                timestamp: new Date().toISOString(),
+                                createdAt: Date.now(),
+                                requiresReview: (data.requires_human_review !== false) && (Math.random() > 0.7),
+                            };
+                            setTasks(prev => [task, ...prev].slice(0, 12));
+                        }
+                    } catch (e) {
+                        console.error('Error parsing SSE:', e);
+                    }
+                };
+                return () => es.close();
+            }, []);
+
+            const handlePlayAudio = (task) => {
+                alert(`Playing audio for: ${task.transcription}`);
+            };
+
+            const handleReview = (task) => {
+                setSelectedReviewTask(task);
+            };
+
+            const handleVoiceTaskCreated = (voiceResult) => {
+                if (voiceResult.task) {
+                    const task = {
+                        id: voiceResult.task.id,
+                        transcription: voiceResult.transcription || voiceResult.task.description,
+                        intent: voiceResult.classification?.intent_type || 'TASK',
+                        priority: voiceResult.task.priority || 'normal',
+                        source: 'voip-phone',
+                        speaker: 'Voice User',
+                        zone: 'Central',
+                        extractedData: voiceResult.task.extracted_entities || { item: 'Unknown', location: 'Unknown' },
+                        confidence: voiceResult.classification?.confidence || 0.5,
+                        timestamp: new Date().toISOString(),
+                        createdAt: Date.now(),
+                        requiresReview: voiceResult.requires_human_review || false,
+                    };
+                    setTasks(prev => [task, ...prev].slice(0, 12));
+                    setIsTransmitting(true);
+                    setTimeout(() => setIsTransmitting(false), 1500);
+                }
+            };
+
+            const reviewTasks = tasks.filter(t => t.requiresReview);
+            const activeTasks = tasks.filter(t => !t.requiresReview);
+
+            return (
+                <div className="w-full h-screen flex flex-col bg-slate-950">
+                    <AudioPulseHeader isTransmitting={isTransmitting} totalOrders={tasks.length} />
+                    
+                    <div className="flex flex-1 overflow-hidden">
+                        {/* The Wire - Live Feed */}
+                        <div className="w-2/5 desktop-only">
+                            <LiveFeed transmissions={transmissions} isTransmitting={isTransmitting} />
+                        </div>
+
+                        {/* The Queue - Task Cards */}
+                        <div className="flex-1 overflow-hidden flex flex-col">
+                            <div className="px-6 py-3 border-b border-slate-800 bg-slate-900/50">
+                                <h2 className="text-sm font-bold text-emerald-400 tracking-wider">THE QUEUE</h2>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {activeTasks.length} Active · {reviewTasks.length} Pending Review
+                                </p>
+                            </div>
+
+                            {reviewTasks.length > 0 && (
+                                <div className="px-6 pt-4 pb-2">
+                                    <div className="text-xs font-bold text-orange-400 tracking-widest mb-2">⚠ REVIEW REQUIRED ({reviewTasks.length})</div>
+                                    <div className="grid gap-3 mb-4">
+                                        {reviewTasks.map(task => (
+                                            <TaskCard key={task.id} task={task} onPlayAudio={handlePlayAudio} onReview={handleReview} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+                                {activeTasks.length === 0 ? (
+                                    <div className="flex items-center justify-center h-full text-center">
+                                        <div>
+                                            <p className="text-gray-500 text-sm">No active tasks</p>
+                                            <p className="text-gray-700 text-xs mt-2">Waiting for incoming transmissions...</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    activeTasks.map(task => (
+                                        <TaskCard key={task.id} task={task} onPlayAudio={handlePlayAudio} onReview={handleReview} />
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Review Modal */}
+                    {selectedReviewTask && (
+                        <ReviewModal task={selectedReviewTask} onClose={() => setSelectedReviewTask(null)} />
+                    )}
+
+                    {/* Voice Recorder */}
+                    <VoiceRecorder onTaskCreated={handleVoiceTaskCreated} />
+                </div>
+            );
+        }
+
+        // Render App
+        try {
+            console.log('[RENDER] Starting to render AICommandCenter...');
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<AICommandCenter />);
+            console.log('[RENDER] Successfully rendered AICommandCenter');
+        } catch (error) {
+            console.error('[RENDER ERROR]', error);
+            document.getElementById('root').innerHTML = `
+                <div style="color: red; padding: 20px; font-family: monospace;">
+                    <h2>❌ React Rendering Error</h2>
+                    <pre>${error.message}\n${error.stack}</pre>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
