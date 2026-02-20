@@ -109,136 +109,34 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <script type="text/babel">
-        const { useState, useRef } = React;
-
-        function VoiceRecorder({ onTaskCreated }) {
-            const [isRecording, setIsRecording] = useState(false);
-            const [isProcessing, setIsProcessing] = useState(false);
-            const [status, setStatus] = useState('');
-            const mediaRecorderRef = useRef(null);
-            const chunksRef = useRef([]);
-
-            const startRecording = async () => {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    chunksRef.current = [];
-                    mediaRecorderRef.current = new MediaRecorder(stream);
-                    
-                    mediaRecorderRef.current.ondataavailable = (e) => {
-                        chunksRef.current.push(e.data);
-                    };
-                    
-                    mediaRecorderRef.current.onstop = async () => {
-                        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-                        if (blob.size === 0) {
-                            setStatus('❌ No audio recorded');
-                            setIsProcessing(false);
-                            return;
-                        }
-                        
-                        const formData = new FormData();
-                        formData.append('file', blob, 'recording.webm');
-                        
-                        try {
-                            const res = await fetch('/mvp/voice', { method: 'POST', body: formData });
-                            const data = await res.json();
-                            
-                            if (!res.ok) {
-                                setStatus(`❌ ${data.message || 'Server error'}`);
-                            } else {
-                                const text = data.transcription || '(no speech detected)';
-                                setStatus(`✅ "${text}"`);
-                                if (onTaskCreated) onTaskCreated(data);
-                                setTimeout(() => setStatus(''), 3000);
-                            }
-                        } catch (err) {
-                            setStatus(`❌ ${err.message}`);
-                        } finally {
-                            setIsProcessing(false);
-                        }
-                    };
-                    
-                    mediaRecorderRef.current.start();
-                    setIsRecording(true);
-                    setStatus('🎤 Recording...');
-                } catch (err) {
-                    setStatus('❌ Microphone denied');
-                    console.error(err);
-                }
-            };
-
-            const stopRecording = () => {
-                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-                    mediaRecorderRef.current.stop();
-                    setIsRecording(false);
-                    setIsProcessing(true);
-                    setStatus('⏳ Processing...');
-                }
-            };
-
-            return (
-                <div className="fixed bottom-8 right-8 z-50">
-                    <button
-                        onClick={isRecording ? stopRecording : startRecording}
-                        disabled={isProcessing}
-                        className={`w-24 h-24 rounded-full text-3xl font-bold transition-all flex items-center justify-center shadow-lg ${
-                            isRecording ? 'bg-red-600 animate-pulse' : isProcessing ? 'bg-gray-600 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600'
-                        }`}
-                    >
-                        {isProcessing ? '⏳' : isRecording ? '⏹️' : '🎤'}
-                    </button>
-                    {status && (
-                        <div className="absolute -top-20 right-0 bg-slate-800 text-white px-4 py-2 rounded text-sm whitespace-nowrap max-w-xs border border-slate-700">
-                            {status}
-                        </div>
-                    )}
-                </div>
-            );
-        }
-
-        function App() {
-            const [tasks, setTasks] = useState([]);
-
-            return (
-                <div className="w-full h-screen bg-slate-950 text-slate-50 flex flex-col">
-                    <div className="border-b border-slate-800 p-4 bg-slate-900">
-                        <h1 className="text-2xl font-bold text-emerald-400">AI Command Center</h1>
-                        <p className="text-xs text-gray-500">Real-time Dispatch Dashboard</p>
-                    </div>
-                    <div className="flex-1 overflow-auto p-6">
-                        {tasks.length === 0 ? (
-                            <p className="text-gray-400">No tasks yet. Click 🎤 to speak.</p>
-                        ) : (
-                            <div className="space-y-4">
-                                {tasks.map((t) => (
-                                    <div key={t.id} className="bg-slate-800 border border-slate-700 rounded p-4">
-                                        <p className="text-sm text-gray-200">{t.description}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    <VoiceRecorder onTaskCreated={(data) => {
-                        setTasks([{ id: Date.now(), description: data.transcription }, ...tasks]);
-                    }} />
-                </div>
-            );
-        }
-
-        try {
-            const root = ReactDOM.createRoot(document.getElementById('root'));
-            root.render(<App />);
-        } catch (err) {
-            console.error('Render error:', err);
-            document.getElementById('root').innerHTML = '<div style="color: red; padding: 20px; font-family: mono;">Failed to load: ' + err.message + '</div>';
-        }
-    </script>
+        // Mock Data Constants
         const INTENTS = ['ORDER', 'STATUS_UPDATE', 'EMERGENCY', 'INQUIRY', 'ESCALATION'];
         const SOURCES = ['walkie-talkie', 'voip-phone'];
         const ZONES = ['Zone A', 'Zone B', 'Zone C', 'Warehouse'];
         const ITEMS = ['Forklift B', 'Pallet Jack', 'Inventory Box', 'Equipment Cart'];
         const LOCATIONS = ['Bay 1', 'Bay 2', 'Bay 3', 'Bay 4', 'Loading Dock', 'Storage'];
+
+        // Generate Mock Task for Demo
+        function generateMockTask() {
+            const now = Date.now();
+            return {
+                id: `task-${Math.random().toString(36).substr(2, 9)}`,
+                transcription: `Requesting ${ITEMS[Math.floor(Math.random() * ITEMS.length)]} for ${LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]}`,
+                intent: INTENTS[Math.floor(Math.random() * INTENTS.length)],
+                priority: Math.random() > 0.7 ? 'high' : (Math.random() > 0.5 ? 'normal' : 'low'),
+                source: SOURCES[Math.floor(Math.random() * SOURCES.length)],
+                speaker: `Operator ${Math.floor(Math.random() * 10) + 1}`,
+                zone: ZONES[Math.floor(Math.random() * ZONES.length)],
+                extractedData: {
+                    item: ITEMS[Math.floor(Math.random() * ITEMS.length)],
+                    location: LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)],
+                },
+                confidence: (Math.random() * 0.4 + 0.6).toFixed(2),
+                timestamp: new Date(now).toISOString(),
+                createdAt: now,
+                requiresReview: Math.random() > 0.7,
+            };
+        }
 
         // Voice Recording Component
         function VoiceRecorder({ onTaskCreated }) {
@@ -341,45 +239,7 @@
                 </div>
             );
         }
-            const now = Date.now();
-            return {
-                id: `task-${Math.random().toString(36).substr(2, 9)}`,
-                transcription: `Requesting ${ITEMS[Math.floor(Math.random() * ITEMS.length)]} for ${LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]}`,
-                intent: INTENTS[Math.floor(Math.random() * INTENTS.length)],
-                priority: Math.random() > 0.7 ? 'high' : (Math.random() > 0.5 ? 'normal' : 'low'),
-                source: SOURCES[Math.floor(Math.random() * SOURCES.length)],
-                speaker: `Operator ${Math.floor(Math.random() * 10) + 1}`,
-                zone: ZONES[Math.floor(Math.random() * ZONES.length)],
-                extractedData: {
-                    item: ITEMS[Math.floor(Math.random() * ITEMS.length)],
-                    location: LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)],
-                },
-                confidence: (Math.random() * 0.4 + 0.6).toFixed(2),
-                timestamp: new Date(now).toISOString(),
-                createdAt: now,
-                requiresReview: Math.random() > 0.7,
-            };
-        }
-        function generateMockTask() {
-            const now = Date.now();
-            return {
-                id: `task-${Math.random().toString(36).substr(2, 9)}`,
-                transcription: `Requesting ${ITEMS[Math.floor(Math.random() * ITEMS.length)]} for ${LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]}`,
-                intent: INTENTS[Math.floor(Math.random() * INTENTS.length)],
-                priority: Math.random() > 0.7 ? 'high' : (Math.random() > 0.5 ? 'normal' : 'low'),
-                source: SOURCES[Math.floor(Math.random() * SOURCES.length)],
-                speaker: `Operator ${Math.floor(Math.random() * 10) + 1}`,
-                zone: ZONES[Math.floor(Math.random() * ZONES.length)],
-                extractedData: {
-                    item: ITEMS[Math.floor(Math.random() * ITEMS.length)],
-                    location: LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)],
-                },
-                confidence: (Math.random() * 0.4 + 0.6).toFixed(2),
-                timestamp: new Date(now).toISOString(),
-                createdAt: now,
-                requiresReview: Math.random() > 0.7,
-            };
-        }
+
         // Waveform Component
         function AudioPulseHeader({ isTransmitting, totalOrders }) {
             return (
@@ -733,7 +593,7 @@
             console.error('[RENDER ERROR]', error);
             document.getElementById('root').innerHTML = `
                 <div style="color: red; padding: 20px; font-family: monospace;">
-                    <h2>❌ React Rendering Error</h2>
+                    <h2> React Rendering Error</h2>
                     <pre>${error.message}\n${error.stack}</pre>
                 </div>
             `;
