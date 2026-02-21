@@ -109,6 +109,7 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <script type="text/babel">
         // Mock Data Constants
         const INTENTS = ['ORDER', 'STATUS_UPDATE', 'EMERGENCY', 'INQUIRY', 'ESCALATION'];
         const SOURCES = ['walkie-talkie', 'voip-phone'];
@@ -140,9 +141,9 @@
 
         // Voice Recording Component
         function VoiceRecorder({ onTaskCreated }) {
-            const [isRecording, setIsRecording] = useState(false);
-            const [isProcessing, setIsProcessing] = useState(false);
-            const [recordingTime, setRecordingTime] = useState(0);
+            const [isRecording, setIsRecording] = React.useState(false);
+            const [isProcessing, setIsProcessing] = React.useState(false);
+            const [recordingTime, setRecordingTime] = React.useState(0);
             const mediaRecorderRef = React.useRef(null);
             const streamRef = React.useRef(null);
             const chunksRef = React.useRef([]);
@@ -288,8 +289,8 @@
 
         // Live Feed Component (The Wire)
         function LiveFeed({ transmissions, isTransmitting }) {
-            const feedRef = useRef(null);
-            useEffect(() => {
+            const feedRef = React.useRef(null);
+            React.useEffect(() => {
                 if (feedRef.current) {
                     feedRef.current.scrollTop = 0;
                 }
@@ -323,8 +324,8 @@
 
         // Task Card Component
         function TaskCard({ task, onPlayAudio, onReview }) {
-            const [elapsedTime, setElapsedTime] = useState(0);
-            useEffect(() => {
+            const [elapsedTime, setElapsedTime] = React.useState(0);
+            React.useEffect(() => {
                 const interval = setInterval(() => {
                     setElapsedTime(Math.floor((Date.now() - task.createdAt) / 1000));
                 }, 1000);
@@ -431,14 +432,14 @@
 
         // Main Dashboard Component
         function AICommandCenter() {
-            const [tasks, setTasks] = useState([]);
-            const [transmissions, setTransmissions] = useState([]);
-            const [isTransmitting, setIsTransmitting] = useState(false);
-            const [selectedReviewTask, setSelectedReviewTask] = useState(null);
-            const [totalOrders] = useState(tasks.length);
+            const [tasks, setTasks] = React.useState([]);
+            const [transmissions, setTransmissions] = React.useState([]);
+            const [isTransmitting, setIsTransmitting] = React.useState(false);
+            const [selectedReviewTask, setSelectedReviewTask] = React.useState(null);
+            const [totalOrders] = React.useState(tasks.length);
 
             // Simulate SSE stream
-            useEffect(() => {
+            React.useEffect(() => {
                 const interval = setInterval(() => {
                     if (Math.random() > 0.6) {
                         const newTask = generateMockTask();
@@ -463,7 +464,7 @@
             }, []);
 
             // Real SSE connection (when backend is ready)
-            useEffect(() => {
+            React.useEffect(() => {
                 const es = new EventSource('/mvp/stream');
                 es.onmessage = (evt) => {
                     try {
