@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch, AsyncMock
 
 # Database tests
 from src.models import (
-    init_db, Session, Transcription, Task, StaffMember, AudioSource,
+    init_db, get_session, Transcription, Task, StaffMember, AudioSource,
     IntentType, TaskStatus, StaffAvailabilityStatus
 )
 
@@ -33,8 +33,8 @@ class TestDatabaseModels:
     
     def setup_method(self):
         """Initialize test database"""
-        init_db()
-        self.db = Session()
+        self.engine = init_db("sqlite:///:memory:")
+        self.db = get_session(self.engine)
     
     def teardown_method(self):
         """Clean up test database"""
@@ -63,7 +63,8 @@ class TestDatabaseModels:
             source=AudioSource.WALKIE_TALKIE,
             raw_text="Test transmission",
             confidence_score=0.88,
-            speaker_id="device_001"
+            speaker_id="device_001",
+            audio_stream_id="test_stream_1"
         )
         
         self.db.add(transcription)
@@ -90,7 +91,8 @@ class TestDatabaseModels:
             source=AudioSource.VOIP_PHONE,
             raw_text="Fix the broken AC",
             confidence_score=0.95,
-            speaker_id="caller_001"
+            speaker_id="caller_001",
+            audio_stream_id="test_stream_2"
         )
         self.db.add(transcription)
         self.db.commit()
@@ -232,19 +234,21 @@ class TestTaskAssigner:
     @pytest.mark.asyncio
     async def test_find_best_assignee_high_urgency(self):
         """Test assignee selection with high urgency"""
-        init_db()
-        db = Session()
+        engine = init_db("sqlite:///:memory:")
+        db = get_session(engine)
         
         try:
             # Create available staff
             staff1 = StaffMember(
                 name="Staff One",
+                role="Housekeeper",
                 department="housekeeping",
                 availability_status=StaffAvailabilityStatus.AVAILABLE,
                 skills="cleaning,laundry"
             )
             staff2 = StaffMember(
                 name="Staff Two",
+                role="Housekeeper",
                 department="housekeeping",
                 availability_status=StaffAvailabilityStatus.ON_BREAK,
                 skills="cleaning,room_service"
@@ -339,13 +343,14 @@ class TestEndToEndWorkflow:
     @pytest.mark.asyncio
     async def test_audio_to_task_workflow(self):
         """Test complete audio processing workflow"""
-        init_db()
-        db = Session()
+        engine = init_db("sqlite:///:memory:")
+        db = get_session(engine)
         
         try:
             # Create staff member
             staff = StaffMember(
                 name="Integration Test Staff",
+                role="Housekeeper",
                 department="housekeeping",
                 phone_number="+1-555-9999",
                 skills="cleaning,laundry"
@@ -359,6 +364,7 @@ class TestEndToEndWorkflow:
                 raw_text="Room 201 needs fresh towels immediately",
                 confidence_score=0.92,
                 speaker_id="test_caller",
+                audio_stream_id="test_stream_3",
                 intent_type=IntentType.TASK,
                 requires_human_review=False
             )

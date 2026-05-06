@@ -98,10 +98,14 @@ class TranscriptionService:
         elif self.provider == TranscriptionProvider.HUGGINGFACE_WHISPER:
             if not HAS_TRANSFORMERS:
                 raise ImportError("transformers package required for Hugging Face Whisper support")
+            device = "cpu"
+            logger.info(f"Initializing Hugging Face Whisper pipeline on device: {device}")
+            
             # Initialize the Hugging Face pipeline
             self.hf_pipeline = pipeline(
                 "automatic-speech-recognition",
-                model=self.model
+                model=self.model,
+                device=device
             )
         
         logger.info(f"Initialized transcription service: {self.provider}")
@@ -154,7 +158,7 @@ class TranscriptionService:
                     openai.Audio.transcribe,
                     model=self.model,
                     file=audio_file,
-                    language=self.language
+                    **({"language": self.language} if self.language and self.language != "auto" else {})
                 ),
                 timeout=self.timeout_seconds
             )
@@ -194,11 +198,22 @@ class TranscriptionService:
             import tempfile
             import os
             
-            # Get ffmpeg from imageio-ffmpeg package
             try:
                 import imageio_ffmpeg
+                import shutil
                 ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
                 os.environ['FFMPEG_BINARY'] = ffmpeg_path
+                ffmpeg_dir = os.path.dirname(ffmpeg_path)
+                
+                ffmpeg_exe = os.path.join(ffmpeg_dir, "ffmpeg.exe" if os.name == 'nt' else "ffmpeg")
+                if not os.path.exists(ffmpeg_exe):
+                    try:
+                        shutil.copy2(ffmpeg_path, ffmpeg_exe)
+                    except Exception as e:
+                        logger.warning(f"Could not copy ffmpeg binary: {e}")
+                
+                if ffmpeg_dir not in os.environ['PATH']:
+                    os.environ['PATH'] = ffmpeg_dir + os.pathsep + os.environ.get('PATH', '')
                 logger.info(f"Using ffmpeg from: {ffmpeg_path}")
             except ImportError:
                 logger.warning("imageio-ffmpeg not available, using system ffmpeg")
@@ -219,16 +234,24 @@ class TranscriptionService:
                 y, sr = await asyncio.to_thread(librosa.load, temp_file, sr=16000, mono=True)
                 logger.info(f"Loaded audio: {len(y)} samples at {sr}Hz")
                 
+                generate_kwargs = {"task": "transcribe"}
+                if self.language and self.language != "auto":
+                    generate_kwargs["language"] = self.language
+                    
                 # Run Whisper pipeline with numpy array
                 response = await asyncio.wait_for(
-                    asyncio.to_thread(self.hf_pipeline, y, sampling_rate=sr),
+                    asyncio.to_thread(self.hf_pipeline, y, sampling_rate=sr, generate_kwargs=generate_kwargs),
                     timeout=self.timeout_seconds
                 )
             except Exception as e:
                 logger.warning(f"Librosa failed ({e}), trying pipeline directly on file")
                 # Fallback: let pipeline handle the file
+                generate_kwargs = {"task": "transcribe"}
+                if self.language and self.language != "auto":
+                    generate_kwargs["language"] = self.language
+                    
                 response = await asyncio.wait_for(
-                    asyncio.to_thread(self.hf_pipeline, temp_file),
+                    asyncio.to_thread(self.hf_pipeline, temp_file, generate_kwargs=generate_kwargs),
                     timeout=self.timeout_seconds
                 )
             
@@ -264,7 +287,7 @@ class TranscriptionService:
     def get_supported_languages(self) -> list:
         """Get list of supported languages"""
         return [
-            "en", "es", "fr", "de", "it", "ja", "ko", "zh", "ru", "ar", "pt"
+            "en", "ar", "ur","hi"
         ]
 
 

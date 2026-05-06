@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,18 +9,50 @@
     <script src="https://cdn.jsdelivr.net/npm/framer-motion@10.16.4/dist/framer-motion.esm.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        * { --font-mono: 'JetBrains Mono', monospace; }
-        body { font-family: 'JetBrains Mono', monospace; }
-        .pulse-glow { animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        * {
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .pulse-glow {
+            animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
         @keyframes pulse-glow {
-            0%, 100% { opacity: 0.6; box-shadow: 0 0 20px rgba(34, 197, 94, 0.3); }
-            50% { opacity: 1; box-shadow: 0 0 40px rgba(34, 197, 94, 0.6); }
+
+            0%,
+            100% {
+                opacity: 0.6;
+                box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+            }
+
+            50% {
+                opacity: 1;
+                box-shadow: 0 0 40px rgba(34, 197, 94, 0.6);
+            }
         }
-        .pulse-orange { animation: pulse-orange 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+
+        .pulse-orange {
+            animation: pulse-orange 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
         @keyframes pulse-orange {
-            0%, 100% { opacity: 0.6; box-shadow: 0 0 20px rgba(249, 115, 22, 0.3); }
-            50% { opacity: 1; box-shadow: 0 0 40px rgba(249, 115, 22, 0.6); }
+
+            0%,
+            100% {
+                opacity: 0.6;
+                box-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
+            }
+
+            50% {
+                opacity: 1;
+                box-shadow: 0 0 40px rgba(249, 115, 22, 0.6);
+            }
         }
+
         .waveform {
             display: flex;
             align-items: center;
@@ -27,29 +60,63 @@
             gap: 4px;
             height: 40px;
         }
+
         .waveform-bar {
             width: 3px;
             background: #9ca3af;
             border-radius: 2px;
             animation: wave-idle 0.6s ease-in-out infinite;
         }
-        .waveform-bar:nth-child(1) { animation-delay: -0.36s; }
-        .waveform-bar:nth-child(2) { animation-delay: -0.24s; }
-        .waveform-bar:nth-child(3) { animation-delay: -0.12s; }
+
+        .waveform-bar:nth-child(1) {
+            animation-delay: -0.36s;
+        }
+
+        .waveform-bar:nth-child(2) {
+            animation-delay: -0.24s;
+        }
+
+        .waveform-bar:nth-child(3) {
+            animation-delay: -0.12s;
+        }
+
         .waveform.active .waveform-bar {
             background: #06b6d4;
             animation: wave-active 0.6s ease-in-out infinite;
         }
+
         @keyframes wave-idle {
-            0%, 100% { height: 8px; }
-            50% { height: 12px; }
+
+            0%,
+            100% {
+                height: 8px;
+            }
+
+            50% {
+                height: 12px;
+            }
         }
+
         @keyframes wave-active {
-            0%, 100% { height: 8px; }
-            25% { height: 24px; }
-            50% { height: 32px; }
-            75% { height: 24px; }
+
+            0%,
+            100% {
+                height: 8px;
+            }
+
+            25% {
+                height: 24px;
+            }
+
+            50% {
+                height: 32px;
+            }
+
+            75% {
+                height: 24px;
+            }
         }
+
         .typing-cursor {
             display: inline-block;
             width: 2px;
@@ -58,32 +125,113 @@
             animation: blink 1s infinite;
             margin-left: 4px;
         }
+
         @keyframes blink {
-            0%, 49% { opacity: 1; }
-            50%, 100% { opacity: 0; }
+
+            0%,
+            49% {
+                opacity: 1;
+            }
+
+            50%,
+            100% {
+                opacity: 0;
+            }
         }
+
         .countdown {
             font-variant-numeric: tabular-nums;
         }
-        .card-priority-high { box-shadow: 0 0 20px rgba(239, 68, 68, 0.4), inset 0 0 1px rgba(239, 68, 68, 0.6); border: 1px solid rgba(239, 68, 68, 0.3); }
-        .card-priority-normal { box-shadow: 0 0 15px rgba(59, 130, 246, 0.3), inset 0 0 1px rgba(59, 130, 246, 0.5); border: 1px solid rgba(59, 130, 246, 0.2); }
-        .card-priority-review { box-shadow: 0 0 20px rgba(249, 115, 22, 0.5), inset 0 0 1px rgba(249, 115, 22, 0.6); border: 2px solid rgba(249, 115, 22, 0.8); animation: pulse-review 1.5s ease-in-out infinite; }
-        @keyframes pulse-review {
-            0%, 100% { box-shadow: 0 0 20px rgba(249, 115, 22, 0.5), inset 0 0 1px rgba(249, 115, 22, 0.6); }
-            50% { box-shadow: 0 0 35px rgba(249, 115, 22, 0.8), inset 0 0 1px rgba(249, 115, 22, 0.8); }
+
+        .card-priority-high {
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4), inset 0 0 1px rgba(239, 68, 68, 0.6);
+            border: 1px solid rgba(239, 68, 68, 0.3);
         }
-        .modal-overlay { animation: fadeIn 0.2s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .modal-content { animation: slideUp 0.3s ease-out; }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .fade-in-text { animation: fadeInText 0.5s ease-out; }
-        @keyframes fadeInText { from { opacity: 0; } to { opacity: 1; } }
+
+        .card-priority-normal {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.3), inset 0 0 1px rgba(59, 130, 246, 0.5);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .card-priority-review {
+            box-shadow: 0 0 20px rgba(249, 115, 22, 0.5), inset 0 0 1px rgba(249, 115, 22, 0.6);
+            border: 2px solid rgba(249, 115, 22, 0.8);
+            animation: pulse-review 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-review {
+
+            0%,
+            100% {
+                box-shadow: 0 0 20px rgba(249, 115, 22, 0.5), inset 0 0 1px rgba(249, 115, 22, 0.6);
+            }
+
+            50% {
+                box-shadow: 0 0 35px rgba(249, 115, 22, 0.8), inset 0 0 1px rgba(249, 115, 22, 0.8);
+            }
+        }
+
+        .modal-overlay {
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal-content {
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .fade-in-text {
+            animation: fadeInText 0.5s ease-out;
+        }
+
+        @keyframes fadeInText {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
         @media (max-width: 768px) {
-            .desktop-only { display: none; }
-            .mobile-feed { position: fixed; bottom: 0; left: 0; right: 0; height: 50vh; z-index: 40; }
+            .desktop-only {
+                display: none;
+            }
+
+            .mobile-feed {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 50vh;
+                z-index: 40;
+            }
         }
     </style>
 </head>
+
 <body class="bg-slate-950 text-slate-50 overflow-hidden">
     <div id="root" class="w-full h-screen flex flex-col">
         <div style="display: flex; align-items: center; justify-content: center; height: 100vh; color: #888;">
@@ -92,7 +240,7 @@
     </div>
 
     <script>
-        window.onerror = function(msg, url, lineNo, columnNo, error) {
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
             console.error('ERROR:', msg, 'at line', lineNo);
             document.getElementById('root').innerHTML = `
                 <div style="color: #ef4444; padding: 40px; font-family: monospace;">
@@ -154,7 +302,7 @@
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
                     streamRef.current = stream;
-                    
+
                     const mediaRecorder = new MediaRecorder(stream);
                     mediaRecorderRef.current = mediaRecorder;
                     chunksRef.current = [];
@@ -174,7 +322,7 @@
 
                     mediaRecorder.start();
                     setIsRecording(true);
-                    
+
                     timerRef.current = setInterval(() => {
                         setRecordingTime(Math.round((Date.now() - recordStartRef.current) / 1000));
                     }, 100);
@@ -338,17 +486,17 @@
                 return `${mins}m ${secs}s`;
             };
 
-            const priorityClass = task.requiresReview ? 'card-priority-review' : 
-                                 (task.priority === 'high' ? 'card-priority-high' : 'card-priority-normal');
+            const priorityClass = task.requiresReview ? 'card-priority-review' :
+                (task.priority === 'high' ? 'card-priority-high' : 'card-priority-normal');
 
             return (
                 <div className={`bg-slate-900/50 rounded-lg p-4 ${priorityClass} fade-in-text`}>
                     <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-2">
                             {task.source === 'walkie-talkie' ? (
-                                <svg className="w-5 h-5 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+                                <svg className="w-5 h-5 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg>
                             ) : (
-                                <svg className="w-5 h-5 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.823.9a16.066 16.066 0 0011.268 11.268l.9-1.823a1 1 0 011.06-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>
+                                <svg className="w-5 h-5 text-cyan-400" fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.823.9a16.066 16.066 0 0011.268 11.268l.9-1.823a1 1 0 011.06-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" /></svg>
                             )}
                             <IntentBadge intent={task.intent} confidence={task.confidence} />
                         </div>
@@ -438,30 +586,7 @@
             const [selectedReviewTask, setSelectedReviewTask] = React.useState(null);
             const [totalOrders] = React.useState(tasks.length);
 
-            // Simulate SSE stream
-            React.useEffect(() => {
-                const interval = setInterval(() => {
-                    if (Math.random() > 0.6) {
-                        const newTask = generateMockTask();
-                        setTasks(prev => [newTask, ...prev].slice(0, 12));
-                        
-                        setIsTransmitting(true);
-                        setTransmissions(prev => [{
-                            text: newTask.transcription,
-                            timestamp: newTask.timestamp,
-                            isTyping: true,
-                        }, ...prev].slice(0, 20));
-                        
-                        setTimeout(() => {
-                            setIsTransmitting(false);
-                            setTransmissions(prev => 
-                                prev.map((t, idx) => idx === 0 ? { ...t, isTyping: false } : t)
-                            );
-                        }, 2000);
-                    }
-                }, 3000);
-                return () => clearInterval(interval);
-            }, []);
+            // Mock SSE stream disabled by user request
 
             // Real SSE connection (when backend is ready)
             React.useEffect(() => {
@@ -529,7 +654,7 @@
             return (
                 <div className="w-full h-screen flex flex-col bg-slate-950">
                     <AudioPulseHeader isTransmitting={isTransmitting} totalOrders={tasks.length} />
-                    
+
                     <div className="flex flex-1 overflow-hidden">
                         {/* The Wire - Live Feed */}
                         <div className="w-2/5 desktop-only">
@@ -601,4 +726,5 @@
         }
     </script>
 </body>
+
 </html>

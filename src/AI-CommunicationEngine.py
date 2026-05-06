@@ -130,16 +130,16 @@ class CommunicationMiddleware:
         return {
             "firebase_credentials_path": self.config.get("firebase", "credentials_path", fallback=None),
             "twilio": {
-                "account_sid": self.config.get("twilio", "account_sid"),
-                "auth_token": self.config.get("twilio", "auth_token"),
-                "phone_number": self.config.get("twilio", "phone_number"),
+                "account_sid": self.config.get("twilio", "account_sid", fallback=""),
+                "auth_token": self.config.get("twilio", "auth_token", fallback=""),
+                "phone_number": self.config.get("twilio", "phone_number", fallback=""),
                 "twiml_url": self.config.get("twilio", "webhook_url", fallback="")
             },
             "email": {
                 "smtp_host": self.config.get("email", "smtp_host", fallback="smtp.gmail.com"),
                 "smtp_port": int(self.config.get("email", "smtp_port", fallback="587")),
-                "sender_email": self.config.get("email", "sender_email"),
-                "sender_password": self.config.get("email", "sender_password")
+                "sender_email": self.config.get("email", "sender_email", fallback=""),
+                "sender_password": self.config.get("email", "sender_password", fallback="")
             }
         }
     
@@ -254,15 +254,15 @@ init_db()
 
 # Load configuration
 config = configparser.ConfigParser()
-if not config.read("config.ini"):
+if not config.read(["config.ini", "config/config.ini"]):
     raise FileNotFoundError("config.ini not found - required for application startup")
 
 # Validate required configuration
 required_configs = [
     ("transcription", "provider"),
     ("transcription", "model"),
-    ("intent_classification", "provider"),
-    ("intent_classification", "model"),
+    ("llm", "provider"),
+    ("llm", "model"),
 ]
 
 for section, option in required_configs:

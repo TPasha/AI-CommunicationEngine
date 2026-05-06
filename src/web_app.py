@@ -33,8 +33,9 @@ classifier = None
 
 transcription_service = TranscriptionService(
     provider="huggingface_whisper",
-    model="openai/whisper-tiny",
-    language="en"
+    model="openai/whisper-large-v3-turbo",
+    language="auto",
+    timeout_ms=30000
 )
 
 # Mount static files and templates
