@@ -287,7 +287,7 @@ class TranscriptionService:
     def get_supported_languages(self) -> list:
         """Get list of supported languages"""
         return [
-            "en", "ar", "ur","hi"
+            "en", "ar", "ur"
         ]
 
 
