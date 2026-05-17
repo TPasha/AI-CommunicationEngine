@@ -9,6 +9,13 @@ import sqlite3
 from datetime import datetime
 from io import BytesIO
 import mimetypes
+import uuid
+
+try:
+    from transformers import pipeline
+    HAS_TRANSFORMERS = True
+except ImportError:
+    HAS_TRANSFORMERS = False
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +45,20 @@ transcription_service = TranscriptionService(
     timeout_ms=30000
 )
 
+# Lightweight Zero-Shot Classifier for task categorization
+zero_shot_classifier = None
+OPERATIONAL_TEAMS = ["Kitchen", "Housekeeping", "Maintenance", "Front Desk", "Security", "Room Service", "Concierge"]
+
+def get_zero_shot_classifier():
+    global zero_shot_classifier
+    if zero_shot_classifier is None and HAS_TRANSFORMERS:
+        logger.info("Initializing lightweight zero-shot classifier (valhalla/distilbart-mnli-12-1)...")
+        zero_shot_classifier = pipeline(
+            "zero-shot-classification",
+            model="valhalla/distilbart-mnli-12-1"
+        )
+    return zero_shot_classifier
+
 # Mount static files and templates
 web_dir = os.path.join(ROOT, "web")
 static_dir = os.path.join(web_dir, "static")
@@ -47,6 +68,11 @@ if os.path.isdir(static_dir):
 templates_dir = os.path.join(web_dir, "templates")
 if os.path.isdir(templates_dir):
     templates = Jinja2Templates(directory=templates_dir)
+
+# Create and mount audio directory for storing voice requests
+audio_dir = os.path.join(ROOT, "data", "audio")
+os.makedirs(audio_dir, exist_ok=True)
+app.mount("/mvp/audio", StaticFiles(directory=audio_dir), name="mvp_audio")
 
 # Simple in-memory pub/sub for notifications (SSE)
 import asyncio
@@ -195,19 +221,49 @@ async def process_voice(file: UploadFile = File(...), speaker_id: Optional[str] 
         
         text = result.text
         
-        # For now, return basic response with transcription only
-        # Classification is skipped to avoid memory issues
+        # Save audio file
+        filename = f"voice_{int(datetime.utcnow().timestamp()*1000)}_{uuid.uuid4().hex[:6]}.wav"
+        filepath = os.path.join(audio_dir, filename)
+        with open(filepath, "wb") as f:
+            f.write(audio_data)
+            
+        audio_url = f"/mvp/audio/{filename}"
+        
+        # Run classification
+        team_category = "General"
+        intent = "ORDER"
+        confidence = 0.5
+        requires_human_review = True
+        
+        classifier_pipeline = get_zero_shot_classifier()
+        if classifier_pipeline:
+            try:
+                clf_result = classifier_pipeline(text, OPERATIONAL_TEAMS)
+                team_category = clf_result["labels"][0]
+                confidence = clf_result["scores"][0]
+                requires_human_review = confidence < 0.6
+                logger.info(f"[VOICE] Classified as {team_category} with {confidence:.2f} confidence")
+            except Exception as e:
+                logger.error(f"[VOICE] Zero-shot classification failed: {str(e)}")
         
         return {
             "status": "ok",
             "transcription": text,
-            "classification": {"primary_intent": "ORDER"},
-            "intent": "ORDER",  # Fallback intent
+            "classification": {
+                "primary_intent": intent,
+                "confidence": confidence,
+                "intent_type": intent
+            },
+            "intent": intent,
+            "requires_human_review": requires_human_review,
             "task": {
                 "id": f"task-voice-{int(datetime.utcnow().timestamp()*1000)}",
                 "description": text,
-                "priority": "normal",
+                "priority": "high" if "urgent" in text.lower() or "emergency" in text.lower() else "normal",
                 "transcription": text,
+                "team_category": team_category,
+                "audio_url": audio_url,
+                "confidence": confidence
             }
         }
         
